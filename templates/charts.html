@@ -1,186 +1,182 @@
 {% extends "base.html" %}
+{% block title %}Analytika · AtletCoach{% endblock %}
 
 {% block content %}
-<main class="mt-6 pb-12">
-    <!-- Page Header -->
-    <div class="mb-8">
-        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Dlhodobý pohľad</p>
-        <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">ANALYTIKA</h2>
+<main class="mt-10 pb-12">
+
+    <!-- Hlavička stránky -->
+    <div class="mb-9">
+        <p class="eyebrow mb-2">Dlhodobý pohľad · biometria</p>
+        <h1 class="font-headline font-extrabold text-[44px] leading-none uppercase text-on-surface">Analytika</h1>
     </div>
 
-    <!-- Stats Row -->
     {% if dates and dates|length > 0 %}
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 reveal">
+
+    <!-- Súhrnné čísla -->
+    {% set rec_vals = recovery_data | reject('none') | list %}
+    <div class="grid grid-cols-2 md:grid-cols-3 border-t border-white/10 mb-12">
         {% if has_hrv %}
-        <div class="bg-surface-container-high rounded-3xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-primary-container flex items-center justify-center flex-shrink-0">
-                <span class="material-symbols-outlined text-primary">favorite</span>
-            </div>
-            <div>
-                <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Priemerné HRV</p>
-                <p class="font-headline font-black text-2xl text-on-surface">
-                    {{ (hrv_data | sum / hrv_data | length) | round(1) }}
-                    <span class="text-sm font-normal text-on-surface-variant"> ms</span>
-                </p>
-            </div>
+        <div class="py-6 pr-6 border-b border-white/10 md:border-r">
+            <p class="eyebrow mb-2">Priemerné HRV</p>
+            <p class="font-headline font-extrabold text-[38px] leading-none text-on-surface">
+                {{ (hrv_data | sum / hrv_data | length) | round(1) }}<span class="mono text-sm font-normal text-on-surface-variant ml-1.5">ms</span>
+            </p>
         </div>
         {% endif %}
-        <div class="bg-surface-container-high rounded-3xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-tertiary-container flex items-center justify-center flex-shrink-0">
-                <span class="material-symbols-outlined text-tertiary">bolt</span>
-            </div>
-            <div>
-                <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Priemerný Recovery</p>
-                <p class="font-headline font-black text-2xl text-on-surface">
-                    {% set rec_vals = recovery_data | reject('none') | list %}
-                    {% if rec_vals | length > 0 %}
-                        {{ (rec_vals | sum / rec_vals | length) | round(1) }}
-                    {% else %}—{% endif %}
-                    <span class="text-sm font-normal text-on-surface-variant"> %</span>
-                </p>
-            </div>
+        <div class="py-6 px-6 border-b border-white/10 md:border-r">
+            <p class="eyebrow mb-2">Priemerný recovery</p>
+            <p class="font-headline font-extrabold text-[38px] leading-none text-on-surface">
+                {% if rec_vals | length > 0 %}{{ (rec_vals | sum / rec_vals | length) | round(1) }}{% else %}—{% endif %}<span class="mono text-sm font-normal text-on-surface-variant ml-1.5">%</span>
+            </p>
         </div>
-        <div class="bg-surface-container-high rounded-3xl p-5 flex items-center gap-4">
-            <div class="w-12 h-12 rounded-2xl bg-secondary-container flex items-center justify-center flex-shrink-0">
-                <span class="material-symbols-outlined text-secondary">calendar_month</span>
-            </div>
-            <div>
-                <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Počet záznamov</p>
-                <p class="font-headline font-black text-2xl text-on-surface">
-                    {{ dates|length if dates else 0 }}
-                    <span class="text-sm font-normal text-on-surface-variant"> dní</span>
-                </p>
-            </div>
+        <div class="py-6 pl-6 border-b border-white/10">
+            <p class="eyebrow mb-2">Rozsah záznamov</p>
+            <p class="font-headline font-extrabold text-[38px] leading-none text-on-surface">
+                {{ dates|length }}<span class="mono text-sm font-normal text-on-surface-variant ml-1.5">dní</span>
+            </p>
         </div>
     </div>
+
+    <!-- Grafy: dve samostatné stupnice = dva samostatné grafy.
+         Spoločná os X ich drží zarovnané, takže sa dajú porovnávať pohľadom,
+         bez toho aby sa dve rôzne jednotky tlačili do jedného obrázka. -->
+    {% if has_hrv %}
+    <section class="mb-10">
+        <div class="rule">
+            <h2 class="font-headline font-bold text-lg text-on-surface">Ranné HRV</h2>
+            <span class="mono text-[11px] text-on-surface-variant">milisekundy</span>
+        </div>
+        <div class="bg-surface-container border border-white/10 p-5">
+            <canvas id="hrvChart" height="78"></canvas>
+        </div>
+    </section>
     {% endif %}
 
-    <!-- Chart Card -->
-    <div class="reveal reveal-d2 bg-surface-container-low rounded-3xl p-6 lg:p-8">
-        <div class="flex items-center justify-between mb-6">
-            <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-2xl bg-surface-container-highest flex items-center justify-center">
-                    <span class="material-symbols-outlined text-on-surface-variant text-xl">show_chart</span>
-                </div>
-                <div>
-                    <h3 class="font-headline font-bold text-on-surface">Trend: HRV & Recovery</h3>
-                    <p class="text-xs text-on-surface-variant">Biometria z SQL databázy</p>
-                </div>
-            </div>
-            <div class="flex items-center gap-4 text-xs font-bold">
-                {% if has_hrv %}
-                <div class="flex items-center gap-1.5">
-                    <div class="w-3 h-3 rounded-full bg-[#22d3ee]"></div>
-                    <span class="text-on-surface-variant">HRV</span>
-                </div>
-                {% endif %}
-                <div class="flex items-center gap-1.5">
-                    <div class="w-3 h-3 rounded-full bg-[#10b981]"></div>
-                    <span class="text-on-surface-variant">Recovery</span>
-                </div>
-            </div>
+    <section>
+        <div class="rule">
+            <h2 class="font-headline font-bold text-lg text-on-surface">WHOOP Recovery</h2>
+            <span class="mono text-[11px] text-on-surface-variant">percentá</span>
         </div>
+        <div class="bg-surface-container border border-white/10 p-5">
+            <canvas id="recoveryChart" height="78"></canvas>
+        </div>
+    </section>
 
-        {% if dates and dates|length > 0 %}
-        <canvas id="analyticsChart" height="90"></canvas>
-        {% else %}
-        <div class="flex flex-col items-center justify-center py-24 text-center">
-            <span class="material-symbols-outlined text-on-surface-variant text-6xl mb-4 opacity-20">insert_chart</span>
-            <p class="text-on-surface-variant font-bold">Nedostatok dát pre zobrazenie grafu</p>
-            <p class="text-xs text-on-surface-variant opacity-60 mt-1">Najprv pridaj záznamy v sekcii Logovanie</p>
-            <a href="{{ url_for('log_data') }}" class="mt-4 bg-primary text-white font-bold px-5 py-2 rounded-xl text-sm uppercase tracking-wider hover:opacity-90 transition-opacity">
-                Pridať záznamy
-            </a>
+    <!-- Dáta aj v tabuľke — graf nie je jediná cesta k číslam. -->
+    <details class="mt-8 border-t border-white/10 pt-5">
+        <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">
+            Zobraziť ako tabuľku
+        </summary>
+        <div class="overflow-x-auto mt-4 border border-white/10">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-white/10 bg-surface-container">
+                        <th class="px-4 py-3 text-left">Dátum</th>
+                        {% if has_hrv %}<th class="px-4 py-3 text-right">HRV (ms)</th>{% endif %}
+                        <th class="px-4 py-3 text-right">Recovery (%)</th>
+                    </tr>
+                </thead>
+                <tbody class="mono text-[13px]">
+                    {% for d in dates %}
+                    <tr class="border-b border-white/5">
+                        <td class="px-4 py-2 text-on-surface-variant">{{ d }}</td>
+                        {% if has_hrv %}<td class="px-4 py-2 text-right">{{ hrv_data[loop.index0] if hrv_data[loop.index0] is not none else '—' }}</td>{% endif %}
+                        <td class="px-4 py-2 text-right">{{ recovery_data[loop.index0] if recovery_data[loop.index0] is not none else '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
-        {% endif %}
+    </details>
+
+    {% else %}
+    <div class="border border-white/10 py-24 text-center">
+        <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+        <p class="text-on-surface mb-1">Nedostatok dát pre zobrazenie grafu.</p>
+        <p class="text-sm text-on-surface-variant mb-6">Najprv pridaj záznamy v sekcii Logovanie.</p>
+        <a href="{{ url_for('log_data') }}"
+           class="inline-block bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em]">
+            Pridať záznamy
+        </a>
     </div>
+    {% endif %}
 </main>
 {% endblock %}
 
 {% block scripts %}
+{% if dates and dates|length > 0 %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    const ctx = document.getElementById("analyticsChart");
-    if (!ctx) return;
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: {{ dates|tojson }},
-            datasets: [
-                {% if has_hrv %}
-                {
-                    label: 'Ranné HRV (ms)',
-                    data: {{ hrv_data|tojson }},
-                    borderColor: '#22d3ee',
-                    backgroundColor: 'rgba(34, 211, 238, 0.07)',
-                    tension: 0.4,
-                    fill: true,
-                    pointBackgroundColor: '#22d3ee',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    yAxisID: 'y'
-                },
-                {% endif %}
-                {
-                    label: 'WHOOP Recovery (%)',
-                    data: {{ recovery_data|tojson }},
-                    borderColor: '#10b981',
-                    backgroundColor: 'rgba(16, 185, 129, 0.07)',
-                    tension: 0.4,
-                    fill: false,
-                    pointBackgroundColor: '#10b981',
-                    pointRadius: 4,
-                    pointHoverRadius: 6,
-                    yAxisID: '{{ "y1" if has_hrv else "y" }}'
-                }
-            ]
-        },
-        options: {
+    const LABELS = {{ dates|tojson }};
+
+    // Spoločné nastavenie: mriežka a osi ustúpia, dáta idú dopredu.
+    function baseOptions(unit) {
+        return {
             responsive: true,
+            maintainAspectRatio: true,
             interaction: { mode: 'index', intersect: false },
             scales: {
-                {% if has_hrv %}
                 y: {
-                    type: 'linear', display: true, position: 'left',
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: { color: '#8896b3', font: { family: 'Inter', size: 11 } },
-                    title: { display: true, text: 'HRV (ms)', color: '#8896b3', font: { family: 'Lexend', size: 11, weight: '700' } }
+                    grid:   { color: 'rgba(236,233,227,0.06)', drawTicks: false },
+                    border: { display: false },
+                    ticks:  { color: '#8b8b84', padding: 10,
+                              font: { family: 'IBM Plex Mono', size: 10 } }
                 },
-                y1: {
-                    type: 'linear', display: true, position: 'right',
-                    grid: { drawOnChartArea: false },
-                    ticks: { color: '#8896b3', font: { family: 'Inter', size: 11 } },
-                    title: { display: true, text: 'Recovery (%)', color: '#8896b3', font: { family: 'Lexend', size: 11, weight: '700' } }
-                },
-                {% else %}
-                y: {
-                    type: 'linear', display: true, position: 'left',
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: { color: '#8896b3', font: { family: 'Inter', size: 11 } },
-                    title: { display: true, text: 'Recovery (%)', color: '#8896b3', font: { family: 'Lexend', size: 11, weight: '700' } }
-                },
-                {% endif %}
                 x: {
-                    grid: { color: 'rgba(255,255,255,0.04)' },
-                    ticks: { color: '#8896b3', font: { family: 'Inter', size: 11 } }
+                    grid:   { display: false },
+                    border: { color: 'rgba(236,233,227,0.14)' },
+                    ticks:  { color: '#8b8b84', maxRotation: 0, autoSkipPadding: 22,
+                              font: { family: 'IBM Plex Mono', size: 10 } }
                 }
             },
             plugins: {
-                legend: { display: false },
+                legend: { display: false },   // jedna séria — názov grafu ju pomenúva
                 tooltip: {
-                    backgroundColor: '#0d1523',
-                    borderColor: 'rgba(255,255,255,0.06)',
+                    backgroundColor: '#0b0b0c',
+                    borderColor: 'rgba(236,233,227,0.20)',
                     borderWidth: 1,
-                    titleColor: '#dee5ff',
-                    bodyColor: '#8896b3',
-                    titleFont: { family: 'Lexend', weight: '700' },
-                    bodyFont: { family: 'Inter' },
-                    padding: 12,
-                    cornerRadius: 12
+                    cornerRadius: 2,
+                    padding: 10,
+                    displayColors: false,
+                    titleColor: '#8b8b84',
+                    titleFont: { family: 'IBM Plex Mono', size: 10, weight: '500' },
+                    bodyColor: '#ece9e3',
+                    bodyFont: { family: 'IBM Plex Mono', size: 13, weight: '600' },
+                    callbacks: {
+                        label: (c) => c.parsed.y === null ? 'bez záznamu' : c.parsed.y + ' ' + unit
+                    }
                 }
             }
-        }
-    });
+        };
+    }
+
+    function lineChart(id, data, color, unit) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        new Chart(el, {
+            type: 'line',
+            data: { labels: LABELS, datasets: [{
+                data: data,
+                borderColor: color,
+                backgroundColor: 'transparent',
+                borderWidth: 2,
+                tension: 0.2,
+                spanGaps: true,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: color,
+                pointHoverBorderColor: '#161617',
+                pointHoverBorderWidth: 2
+            }]},
+            options: baseOptions(unit)
+        });
+    }
+
+    {% if has_hrv %}
+    lineChart('hrvChart', {{ hrv_data|tojson }}, '#879c26', 'ms');
+    {% endif %}
+    lineChart('recoveryChart', {{ recovery_data|tojson }}, '#3987e5', '%');
 });
 </script>
+{% endif %}
 {% endblock %}

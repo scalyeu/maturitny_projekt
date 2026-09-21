@@ -1,80 +1,70 @@
 {% extends "base.html" %}
+{% block title %}Strava dashboard · AtletCoach{% endblock %}
 
 {% block content %}
-<main class="mt-6 pb-12">
+<main class="mt-10 pb-12">
 
-    <!-- Header -->
-    <div class="flex items-end justify-between flex-wrap gap-4 mb-8">
+    <!-- Hlavička -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
         <div>
-            <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Strava · Posledné aktivity</p>
-            <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">DASHBOARD</h2>
-            <p class="text-sm text-on-surface-variant mt-1">{{ trainings|length }} najnovších aktivít</p>
+            <p class="eyebrow mb-2">Strava · posledné aktivity</p>
+            <h1 class="font-headline font-extrabold text-[44px] leading-none uppercase text-on-surface">Dashboard</h1>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">{{ trainings|length }} najnovších aktivít</p>
         </div>
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2.5">
             <a href="{{ url_for('osobaky') }}"
-               class="flex items-center gap-2 bg-surface-container-high border border-white/8 hover:border-primary/30 text-on-surface-variant hover:text-on-surface px-4 py-2 rounded-xl text-sm font-bold transition-all">
-                <span class="material-symbols-outlined text-base text-primary">emoji_events</span>
+               class="border border-white/15 hover:border-white/35 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors">
                 Osobáky
             </a>
             {% if logged_in %}
             <a href="{{ url_for('logout') }}"
-               class="flex items-center gap-2 bg-surface-container-high border border-white/8 hover:border-red-500/30 text-on-surface-variant hover:text-red-400 px-4 py-2 rounded-xl text-sm font-bold transition-all">
-                <span class="material-symbols-outlined text-base">logout</span>
+               class="border border-white/15 hover:border-[#e66767] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-[#e66767] transition-colors">
                 Odhlásiť
             </a>
             {% endif %}
         </div>
     </div>
 
-    <!-- Table Card -->
-    <div class="reveal bg-surface-container-low rounded-3xl overflow-x-auto border border-white/5">
-        <table class="w-full text-sm min-w-[600px]">
+    <!-- Tabuľka aktivít -->
+    <div class="overflow-x-auto border border-white/10">
+        <table class="w-full text-sm min-w-[720px]">
             <thead>
-                <tr class="border-b border-white/8">
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Dátum</th>
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Aktivita</th>
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Vzdialenosť</th>
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Čas</th>
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">Tempo / Rýchlosť</th>
-                    <th class="px-5 py-4 text-left text-[10px] font-bold uppercase tracking-wider text-on-surface-variant">HR</th>
+                <tr class="border-b border-white/10 bg-surface-container">
+                    <th class="px-4 py-3.5 text-left">Dátum</th>
+                    <th class="px-4 py-3.5 text-left">Aktivita</th>
+                    <th class="px-4 py-3.5 text-right">Vzdialenosť</th>
+                    <th class="px-4 py-3.5 text-right">Čas</th>
+                    <th class="px-4 py-3.5 text-right">Tempo</th>
+                    <th class="px-4 py-3.5 text-right">Tep</th>
                 </tr>
             </thead>
             <tbody>
                 {% for t in trainings %}
-                <tr class="border-b border-white/5 hover:bg-white/3 transition-colors group">
-                    <td class="px-5 py-4 text-xs text-on-surface-variant font-medium">{{ t.date }}</td>
-                    <td class="px-5 py-4">
-                        <div class="flex items-center gap-2">
-                            <span class="material-symbols-outlined text-primary text-sm">
-                                {% if 'Ride' in t.type or 'Cycling' in t.type %}directions_bike
-                                {% elif 'Swim' in t.type %}pool
-                                {% else %}directions_run{% endif %}
-                            </span>
-                            <span class="font-bold text-on-surface text-sm">{{ t.name }}</span>
-                        </div>
+                <tr class="border-b border-white/5 hover:bg-surface-container transition-colors">
+                    <td class="px-4 py-3.5 mono text-[12px] text-on-surface-variant whitespace-nowrap">{{ t.date }}</td>
+                    <td class="px-4 py-3.5">
+                        <span class="mono text-[10px] uppercase tracking-[0.1em] text-on-surface-variant mr-2.5">
+                            {% if 'Ride' in t.type or 'Cycling' in t.type %}bike
+                            {% elif 'Swim' in t.type %}swim
+                            {% else %}run{% endif %}
+                        </span>
+                        <span class="text-on-surface">{{ t.name }}</span>
                     </td>
-                    <td class="px-5 py-4 font-headline font-bold text-on-surface">
-                        {{ t.distance }} <span class="text-xs text-on-surface-variant font-normal">km</span>
+                    <td class="px-4 py-3.5 text-right mono text-on-surface whitespace-nowrap">
+                        {{ t.distance }}<span class="text-on-surface-variant"> km</span>
                     </td>
-                    <td class="px-5 py-4 text-on-surface-variant">{{ t.moving_time }}</td>
-                    <td class="px-5 py-4 font-headline font-bold text-primary">{{ t.pace }}</td>
-                    <td class="px-5 py-4">
-                        {% if t.hr %}
-                        <span class="font-bold text-on-surface">{{ t.hr }}</span>
-                        <span class="text-xs text-on-surface-variant"> bpm</span>
-                        {% else %}
-                        <span class="text-on-surface-variant opacity-40">—</span>
-                        {% endif %}
+                    <td class="px-4 py-3.5 text-right mono text-on-surface-variant whitespace-nowrap">{{ t.moving_time }}</td>
+                    <td class="px-4 py-3.5 text-right mono whitespace-nowrap" style="color:var(--volt)">{{ t.pace }}</td>
+                    <td class="px-4 py-3.5 text-right mono whitespace-nowrap">
+                        {% if t.hr %}<span class="text-on-surface">{{ t.hr }}</span><span class="text-on-surface-variant"> bpm</span>
+                        {% else %}<span class="text-on-surface-variant">—</span>{% endif %}
                     </td>
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="6" class="px-5 py-20 text-center">
-                        <div class="flex flex-col items-center">
-                            <span class="material-symbols-outlined text-on-surface-variant text-5xl mb-3 opacity-20">directions_run</span>
-                            <p class="text-on-surface-variant font-bold">Žiadne aktivity</p>
-                            <p class="text-xs text-on-surface-variant opacity-50 mt-1">Skontroluj Strava pripojenie</p>
-                        </div>
+                    <td colspan="6" class="px-4 py-20 text-center">
+                        <p class="eyebrow mb-2">Žiadne aktivity</p>
+                        <p class="text-on-surface-variant text-sm">Skontroluj pripojenie na Stravu.</p>
                     </td>
                 </tr>
                 {% endfor %}

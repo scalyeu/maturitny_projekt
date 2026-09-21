@@ -5,18 +5,18 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
 <style>
-    #map { width: 100%; height: 100%; border-radius: 1.5rem; }
-    .leaflet-container { background: #060e20; }
+    #map { width: 100%; height: 100%; border-radius: 2px; }
+    .leaflet-container { background: #0b0b0c; }
     .info-chip {
-        background: rgba(6,14,32,0.85);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255,255,255,0.07);
-        border-radius: 1rem;
-        padding: 0.5rem 1rem;
-        color: #dee5ff;
-        font-size: 0.75rem;
-        font-family: 'Lexend', sans-serif;
-        font-weight: 700;
+        background: #161617;
+        border: 1px solid rgba(236,233,227,0.14);
+        border-radius: 2px;
+        padding: 0.45rem 0.85rem;
+        color: #ece9e3;
+        font-size: 11px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-weight: 500;
+        letter-spacing: 0.06em;
     }
 </style>
 {% endblock %}
@@ -27,8 +27,8 @@
     <!-- Header -->
     <div class="flex items-end justify-between">
         <div>
-            <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Strava</p>
-            <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">MOJE TRASY</h2>
+            <p class="eyebrow mb-2">Strava</p>
+            <h2 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">MOJE TRASY</h2>
         </div>
         <div id="stats-bar" class="hidden flex items-center gap-3 pb-1">
             <div class="info-chip">
@@ -123,7 +123,7 @@ function initMap() {
     }).addTo(map);
 
     L.control.attribution({ prefix: false })
-        .addAttribution('© <a href="https://carto.com/" style="color:#ff7852">CARTO</a> · © <a href="https://www.openstreetmap.org/" style="color:#ff7852">OSM</a>')
+        .addAttribution('© <a href="https://carto.com/" style="color:#8b8b84">CARTO</a> · © <a href="https://www.openstreetmap.org/" style="color:#8b8b84">OSM</a>')
         .addTo(map);
 }
 

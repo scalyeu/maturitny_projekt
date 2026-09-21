@@ -3,389 +3,279 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Track AI{% endblock %}</title>
+    <title>{% block title %}AtletCoach{% endblock %}</title>
 
     <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <script>
+        /* ── AtletCoach design tokens ──────────────────────────────────
+           Jedna akcentná farba (volt) na uhoľnom podklade. Názvy tokenov
+           zostali rovnaké ako predtým, takže ich preberú všetky šablóny. */
         tailwind.config = {
             darkMode: "class",
             theme: {
                 extend: {
                     fontFamily: {
-                        headline: ['Lexend', 'sans-serif'],
-                        body: ['Inter', 'sans-serif'],
+                        headline: ['Archivo', 'sans-serif'],
+                        body: ['"IBM Plex Sans"', 'sans-serif'],
+                        data: ['"IBM Plex Mono"', 'monospace'],
                     },
                     colors: {
-                        primary: '#ff7852',
-                        tertiary: '#ffa766',
-                        secondary: '#b8c7ea',
-                        'surface-container-highest': '#1e2d47',
-                        'surface-container-high': '#162033',
-                        'surface-container': '#0f1826',
-                        'surface-container-low': '#0d1523',
-                        'surface-bright': '#1a2844',
-                        'on-surface': '#dee5ff',
-                        'on-surface-variant': '#8896b3',
-                        'primary-container': 'rgba(255,120,82,0.15)',
-                        'secondary-container': 'rgba(184,199,234,0.15)',
-                        'tertiary-container': 'rgba(255,167,102,0.15)',
-                    }
+                        primary: '#d7f24a',
+                        tertiary: '#6ea8fe',
+                        secondary: '#9aa0a6',
+                        'surface-container-highest': '#262627',
+                        'surface-container-high': '#1c1c1d',
+                        'surface-container': '#161617',
+                        'surface-container-low': '#101011',
+                        'surface-bright': '#2e2e30',
+                        'on-surface': '#ece9e3',
+                        'on-surface-variant': '#8b8b84',
+                        'primary-container': 'rgba(215,242,74,0.12)',
+                        'secondary-container': 'rgba(154,160,166,0.12)',
+                        'tertiary-container': 'rgba(110,168,254,0.12)',
+                    },
+                    /* Ostré hrany namiesto zaoblených kariet. Prepisuje to
+                       všetky rounded-* triedy naprieč šablónami naraz. */
+                    borderRadius: {
+                        none: '0', sm: '2px', DEFAULT: '2px', md: '3px',
+                        lg: '3px', xl: '4px', '2xl': '4px', '3xl': '5px',
+                        full: '9999px',
+                    },
                 }
             }
         };
     </script>
 
     <style>
-        /* ── Base ── */
+        /* ── Základ ── */
         *, *::before, *::after { box-sizing: border-box; }
 
-        body {
-            background-color: #060e20;
-            color: #dee5ff;
-            font-family: 'Inter', sans-serif;
-            overflow-x: hidden;
+        :root {
+            --ink:          #0b0b0c;
+            --line:         rgba(236,233,227,0.10);
+            --line-strong:  rgba(236,233,227,0.20);
+            --volt:         #d7f24a;
+            /* Sériové farby grafov — validované na tmavom podklade
+               (lightness, chroma, odstup pri farbosleposti aj kontrast). */
+            --series-1:     #879c26;
+            --series-2:     #3987e5;
+            --series-3:     #d55181;
         }
-        .font-headline { font-family: 'Lexend', sans-serif; }
+
+        body {
+            background-color: var(--ink);
+            color: #ece9e3;
+            font-family: 'IBM Plex Sans', system-ui, sans-serif;
+            font-size: 14px;
+            line-height: 1.55;
+            overflow-x: hidden;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* Displejové písmo: stlačené, veľké, s tabuľkovými číslicami —
+           čísla sa pod sebou zarovnajú ako na časomiere. */
+        .font-headline {
+            font-family: 'Archivo', sans-serif;
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -0.025em;
+        }
+        .font-data, table td, table th {
+            font-variant-numeric: tabular-nums;
+        }
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Drobný verzálkový popisok — nosný prvok celého rozhrania. */
+        .eyebrow {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.14em;
+            color: #8b8b84;
+        }
 
         /* ── Scrollbar ── */
-        ::-webkit-scrollbar { width: 5px; height: 5px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #1e2d47; border-radius: 999px; }
-        ::-webkit-scrollbar-thumb:hover { background: #2a3f60; }
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--ink); }
+        ::-webkit-scrollbar-thumb { background: #2e2e30; border: 3px solid var(--ink); }
+        ::-webkit-scrollbar-thumb:hover { background: #45454a; }
 
-        /* ── Ambient background orb ── */
-        .bg-orb {
-            position: fixed;
-            border-radius: 50%;
-            filter: blur(120px);
-            pointer-events: none;
-            z-index: 0;
-            animation: orbFloat 12s ease-in-out infinite;
+        ::selection { background: var(--volt); color: var(--ink); }
+
+        /* ── Volt tlačidlá: na svetlom akcente musí byť tmavý text ── */
+        .bg-primary, .bg-primary.text-white {
+            color: var(--ink) !important;
+            font-weight: 600;
         }
-        .bg-orb-1 {
-            width: 600px; height: 600px;
-            background: radial-gradient(circle, rgba(255,120,82,0.06) 0%, transparent 70%);
-            top: -200px; right: -200px;
-            animation-delay: 0s;
-        }
-        .bg-orb-2 {
-            width: 500px; height: 500px;
-            background: radial-gradient(circle, rgba(184,199,234,0.04) 0%, transparent 70%);
-            bottom: -150px; left: -150px;
-            animation-delay: -6s;
-        }
-        @keyframes orbFloat {
-            0%, 100% { transform: translate(0,0) scale(1); }
-            33%       { transform: translate(30px,-20px) scale(1.05); }
-            66%       { transform: translate(-20px,30px) scale(0.97); }
+        .bg-primary svg { fill: var(--ink); }
+        .bg-primary:hover { background-color: #e4ff63; }
+        /* Neaktívne tlačidlo nemá byť len stlmený volt (vyzeralo to kalne
+           olivovo) — má byť jasne šedé, aby bolo vidieť, že sa nedá kliknúť. */
+        button:disabled, .bg-primary:disabled, [disabled] {
+            background-color: #232325 !important;
+            color: #5c5c57 !important;
+            border-color: rgba(236,233,227,0.08) !important;
+            cursor: not-allowed;
+            opacity: 1 !important;
         }
 
-        /* ── Page fade-in ── */
-        .page-content {
-            animation: pageFadeIn 0.4s ease both;
+        /* ── Formuláre ── */
+        input, textarea, select {
+            background: #101011 !important;
+            border: 1px solid var(--line) !important;
+            color: #ece9e3 !important;
+            border-radius: 2px !important;
+            padding: 0.55rem 0.7rem !important;
+            font-family: 'IBM Plex Sans', sans-serif !important;
+            font-size: 14px !important;
+            transition: border-color 0.12s linear !important;
+            outline: none !important;
         }
-        @keyframes pageFadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to   { opacity: 1; transform: translateY(0); }
+        input:focus, textarea:focus, select:focus {
+            border-color: var(--volt) !important;
+            box-shadow: none !important;
+        }
+        input::placeholder, textarea::placeholder { color: #5c5c57 !important; }
+
+        /* Polia vypĺňali len časť riadku a popisky im sedeli inline po boku,
+           takže sa text lepil na rámček. Popisok patrí nad pole. */
+        input:not([type="checkbox"]):not([type="radio"]):not([class]),
+        textarea:not([class]), select:not([class]) { width: 100%; }
+        label:not([class]) {
+            display: block;
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #8b8b84;
+            margin-bottom: 6px;
         }
 
-        /* ── Card animations ── */
-        .card-enter {
-            animation: cardEnter 0.5s cubic-bezier(.22,.68,0,1.2) both;
-        }
-        @keyframes cardEnter {
-            from { opacity: 0; transform: translateY(20px) scale(0.97); }
-            to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        .delay-1 { animation-delay: .05s; }
-        .delay-2 { animation-delay: .1s;  }
-        .delay-3 { animation-delay: .15s; }
-        .delay-4 { animation-delay: .2s;  }
-        .delay-5 { animation-delay: .25s; }
-        .delay-6 { animation-delay: .3s;  }
-
-        /* ── Hover lift ── */
-        .hover-lift {
-            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
-        }
-        .hover-lift:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+        /* ── Hlavička ── */
+        .wordmark {
+            font-family: 'Archivo', sans-serif;
+            font-weight: 800;
+            font-size: 19px;
+            letter-spacing: -0.04em;
+            text-transform: uppercase;
+            color: #ece9e3;
+            white-space: nowrap;
         }
 
-        /* ── Gradient text ── */
-        .gradient-text {
-            background: linear-gradient(135deg, #ff7852 0%, #ffa766 50%, #dee5ff 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            display: inline-block;
-            padding-top: 0.25em;
-            margin-top: -0.25em;
-            line-height: 1.4;
-            overflow: visible;
-        }
-
-        /* ── Glow button ── */
-        .btn-glow {
+        .navlink {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #8b8b84;
+            padding: 6px 0;
             position: relative;
-            transition: all 0.2s ease;
+            transition: color 0.12s linear;
+            white-space: nowrap;
         }
-        .btn-glow::after {
+        .navlink:hover { color: #ece9e3; }
+        .navlink.active { color: #ece9e3; }
+        .navlink.active::after {
             content: '';
             position: absolute;
-            inset: -2px;
-            border-radius: inherit;
-            background: linear-gradient(135deg, #ff7852, #ffa766);
-            opacity: 0;
-            filter: blur(8px);
-            z-index: -1;
-            transition: opacity 0.2s ease;
+            left: 0; right: 0; bottom: -11px;
+            height: 2px;
+            background: var(--volt);
         }
-        .btn-glow:hover::after { opacity: 0.5; }
-        .btn-glow:active { transform: scale(0.97); }
 
-        /* ── Shimmer loader ── */
+        /* ── Plochy ──
+           Žiadne tiene ani rozmazané sklo — len linka a odstup plochy. */
+        .glass, .glow-card, .tilt-card, .hover-lift, .gradient-border {
+            background: #161617;
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            box-shadow: none !important;
+            transform: none !important;
+        }
+        .glow-card, .tilt-card, .hover-lift {
+            transition: border-color 0.12s linear, background-color 0.12s linear;
+        }
+        .glow-card:hover, .tilt-card:hover, .hover-lift:hover {
+            border-color: var(--line-strong) !important;
+        }
+        .glow-card::after, .glow-card::before,
+        .gradient-border::before, .gradient-border::after { display: none !important; }
+
+        /* ── Vypnuté efekty z predchádzajúcej verzie ──
+           Triedy nechávam definované, aby šablóny nepadali, ale nerobia nič. */
+        .bg-orb, #cursor-spotlight { display: none !important; }
+        .gradient-text {
+            background: none !important;
+            -webkit-text-fill-color: currentColor !important;
+            color: var(--volt);
+            display: inline;
+            padding: 0; margin: 0;
+        }
+        .btn-glow::after, .ripple::before { display: none !important; }
+        .btn-glow:active, .ripple:active { opacity: 0.82; }
+        .logo-animated, .float-icon, .float-icon-slow, .num-pop, .pulse-dot,
+        .card-enter, .line-draw {
+            animation: none !important;
+        }
+        .line-draw { stroke-dashoffset: 0; stroke-dasharray: none; }
+        /* Obsah je viditeľný hneď — nečaká na skript ani na odscrollovanie. */
+        .reveal, .reveal-left, .reveal-scale, .page-content {
+            opacity: 1 !important;
+            transform: none !important;
+            animation: none !important;
+            transition: none !important;
+        }
+
+        /* Shimmer zostáva — je to funkčný indikátor načítavania. */
         .shimmer {
-            background: linear-gradient(90deg, #0f1826 25%, #162033 50%, #0f1826 75%);
+            background: linear-gradient(90deg, #161617 25%, #232325 50%, #161617 75%);
             background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+            animation: shimmer 1.4s linear infinite;
         }
         @keyframes shimmer {
             0%   { background-position: 200% 0; }
             100% { background-position: -200% 0; }
         }
 
-        /* ── Pulse dot ── */
-        .pulse-dot {
-            animation: pulseDot 2s ease-in-out infinite;
-        }
-        @keyframes pulseDot {
-            0%, 100% { transform: scale(1); opacity: 1; }
-            50%       { transform: scale(1.4); opacity: 0.6; }
-        }
-
-        /* ── Number count-up ── */
-        .count-up { transition: all 0.3s ease; }
-
-        /* ── Inputs ── */
-        input, textarea, select {
-            background: #0f1826 !important;
-            border: 1px solid #1e2d47 !important;
-            color: #dee5ff !important;
-            border-radius: 0.75rem !important;
-            padding: 0.6rem 0.8rem !important;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
-            outline: none !important;
-        }
-        input:focus, textarea:focus, select:focus {
-            border-color: rgba(255,120,82,0.5) !important;
-            box-shadow: 0 0 0 3px rgba(255,120,82,0.1) !important;
+        /* ── Tabuľky ── */
+        table th {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 10px !important;
+            font-weight: 500 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: #8b8b84 !important;
         }
 
-        /* ── Flash messages ── */
-        .flash-msg {
-            animation: slideDown 0.35s cubic-bezier(.22,.68,0,1.2) both;
-        }
-        @keyframes slideDown {
-            from { opacity: 0; transform: translateY(-12px); }
-            to   { opacity: 1; transform: translateY(0); }
-        }
+        /* ── Hlásenia ── */
+        .flash-msg { animation: none; border-radius: 2px; }
 
-        /* ── Nav active indicator ── */
-        nav a {
-            position: relative;
-            transition: color 0.2s ease, background 0.2s ease;
+        /* ── Deliaca linka s popisom ── */
+        .rule {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 0 0 18px;
         }
-        nav a.active::after {
+        .rule::after {
             content: '';
-            position: absolute;
-            bottom: -2px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 16px;
-            height: 2px;
-            border-radius: 999px;
-            background: #ff7852;
-            animation: navIndicator 0.3s ease both;
-        }
-        @keyframes navIndicator {
-            from { width: 0; opacity: 0; }
-            to   { width: 16px; opacity: 1; }
+            flex: 1;
+            height: 1px;
+            background: var(--line);
         }
 
-        /* ── Navbar logo pulse ── */
-        @keyframes logoPulse {
-            0%, 100% { text-shadow: 0 0 0 rgba(255,120,82,0); }
-            50%       { text-shadow: 0 0 20px rgba(255,120,82,0.4); }
-        }
-        .logo-animated { animation: logoPulse 4s ease-in-out infinite; }
-
-        /* ── Chart.js tooltip override ── */
-        .chartjs-tooltip { font-family: 'Inter', sans-serif !important; }
-
-        /* ── Ripple on click ── */
-        .ripple {
-            position: relative;
-            overflow: hidden;
-        }
-        .ripple::before {
-            content: '';
-            position: absolute;
-            top: 50%; left: 50%;
-            width: 0; height: 0;
-            transform: translate(-50%,-50%);
-            border-radius: 50%;
-            background: rgba(255,255,255,0.1);
-            transition: width 0.4s ease, height 0.4s ease, opacity 0.4s ease;
-            opacity: 0;
-        }
-        .ripple:active::before {
-            width: 200px; height: 200px;
-            opacity: 1;
-            transition: none;
-        }
-
-        /* ── View Transitions (page-to-page) ── */
-        @supports (view-transition-name: none) {
-            @view-transition { navigation: auto; }
-            ::view-transition-old(root) {
-                animation: 200ms ease-out both vt-out;
-            }
-            ::view-transition-new(root) {
-                animation: 320ms cubic-bezier(.22,.68,0,1.1) 80ms both vt-in;
-            }
-            @keyframes vt-out {
-                to { opacity: 0; transform: translateY(-6px) scale(0.99); }
-            }
-            @keyframes vt-in {
-                from { opacity: 0; transform: translateY(14px) scale(0.99); }
-            }
-        }
-
-        /* ── Scroll reveal ── */
-        .reveal {
-            opacity: 0;
-            transform: translateY(30px);
-            transition: opacity 0.65s cubic-bezier(.22,.68,0,1.15), transform 0.65s cubic-bezier(.22,.68,0,1.15);
-        }
-        .reveal-left {
-            opacity: 0;
-            transform: translateX(-30px);
-            transition: opacity 0.65s cubic-bezier(.22,.68,0,1.15), transform 0.65s cubic-bezier(.22,.68,0,1.15);
-        }
-        .reveal-scale {
-            opacity: 0;
-            transform: scale(0.93);
-            transition: opacity 0.6s cubic-bezier(.22,.68,0,1.3), transform 0.6s cubic-bezier(.22,.68,0,1.3);
-        }
-        .reveal.is-visible, .reveal-left.is-visible, .reveal-scale.is-visible { opacity: 1; transform: none; }
-        .reveal-d1 { transition-delay: .05s; }
-        .reveal-d2 { transition-delay: .12s; }
-        .reveal-d3 { transition-delay: .19s; }
-        .reveal-d4 { transition-delay: .26s; }
-        .reveal-d5 { transition-delay: .33s; }
-        .reveal-d6 { transition-delay: .40s; }
-
-        /* ── Glow card hover ── */
-        .glow-card {
-            transition: transform 0.3s cubic-bezier(.22,.68,0,1.2), box-shadow 0.3s ease;
-            position: relative;
-        }
-        .glow-card::after {
-            content: '';
-            position: absolute;
-            inset: 0;
-            border-radius: inherit;
-            box-shadow: 0 0 0 0 rgba(255,120,82,0);
-            transition: box-shadow 0.35s ease;
-            pointer-events: none;
-            z-index: 0;
-        }
-        .glow-card:hover { transform: translateY(-5px); box-shadow: 0 24px 60px rgba(0,0,0,0.45); }
-        .glow-card:hover::after { box-shadow: 0 0 0 1px rgba(255,120,82,0.22), 0 0 35px rgba(255,120,82,0.07); }
-
-        /* ── Cursor spotlight ── */
-        #cursor-spotlight {
-            position: fixed;
-            pointer-events: none;
-            z-index: 0;
-            width: 600px;
-            height: 600px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(255,120,82,0.035) 0%, transparent 65%);
-            transform: translate(-50%, -50%);
-            will-change: left, top;
-            transition: left 0.08s linear, top 0.08s linear;
-        }
-
-        /* ── Tilt card (subtle 3-D on hover) ── */
-        .tilt-card { transform-style: preserve-3d; }
-
-        /* ── Animated gradient border ── */
-        @keyframes borderSpin {
-            from { --border-angle: 0turn; }
-            to   { --border-angle: 1turn; }
-        }
-        @property --border-angle {
-            syntax: '<angle>';
-            initial-value: 0turn;
-            inherits: false;
-        }
-        .gradient-border {
-            position: relative;
-        }
-        .gradient-border::before {
-            content: '';
-            position: absolute;
-            inset: -1px;
-            border-radius: inherit;
-            background: conic-gradient(from var(--border-angle), transparent 75%, rgba(255,120,82,0.5) 85%, rgba(255,167,102,0.5) 90%, transparent 100%);
-            animation: borderSpin 4s linear infinite;
-            z-index: -1;
-            opacity: 0;
-            transition: opacity 0.3s ease;
-        }
-        .gradient-border:hover::before { opacity: 1; }
-
-        /* ── Floating icon ── */
-        @keyframes floatIcon {
-            0%, 100% { transform: translateY(0) rotate(0deg); }
-            50%       { transform: translateY(-5px) rotate(3deg); }
-        }
-        .float-icon { animation: floatIcon 4s ease-in-out infinite; }
-        .float-icon-slow { animation: floatIcon 6s ease-in-out infinite; }
-
-        /* ── Stat number pop ── */
-        @keyframes numPop {
-            0%   { transform: scale(1); }
-            40%  { transform: scale(1.08); }
-            100% { transform: scale(1); }
-        }
-        .num-pop { animation: numPop 0.4s cubic-bezier(.22,.68,0,1.5) both; }
-
-        /* ── Glass card ── */
-        .glass {
-            background: rgba(22, 32, 51, 0.6) !important;
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255,255,255,0.06) !important;
-        }
-
-        /* ── Line draw ── */
-        .line-draw {
-            stroke-dashoffset: 1000;
-            stroke-dasharray: 1000;
-            animation: lineDraw 1.5s ease forwards;
-        }
-        @keyframes lineDraw {
-            to { stroke-dashoffset: 0; }
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation: none !important; transition: none !important; }
         }
     </style>
 
@@ -393,92 +283,85 @@
 </head>
 
 <body>
-<!-- Cursor spotlight -->
-<div id="cursor-spotlight"></div>
 
-<!-- Ambient orbs -->
-<div class="bg-orb bg-orb-1"></div>
-<div class="bg-orb bg-orb-2"></div>
+<!-- ── HLAVIČKA ── -->
+<header class="sticky top-0 z-50 border-b border-white/10 bg-[#0b0b0c]">
+    <div class="max-w-[1180px] mx-auto px-5 h-[60px] flex items-center justify-between gap-6">
 
-<!-- ── NAVBAR ── -->
-<header class="sticky top-0 z-50 border-b border-white/5" style="background: rgba(6,14,32,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);">
-    <div class="max-w-6xl mx-auto px-4 lg:px-6 h-16 flex items-center justify-between">
-
-        <!-- Logo -->
-        <a href="{{ url_for('index') }}" class="font-headline font-black text-xl tracking-tight logo-animated flex items-center gap-2">
-            <span style="background:linear-gradient(135deg,#ff7852,#ffa766);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">TRACK</span>
-            <span class="text-on-surface-variant font-light">AI</span>
+        <a href="{{ url_for('index') }}" class="wordmark">
+            Atlet<span style="color:var(--volt)">Coach</span>
         </a>
 
-        <!-- Nav links -->
-        <nav class="hidden md:flex items-center gap-0.5 text-sm font-semibold">
-            {% set nav_items = [
-                ('index',      'Domov'),
-                ('video_page', 'Video'),
-                ('hurdles_page', 'Prekážky'),
-                ('dashboard',  'Dashboard'),
-                ('log_data',   'Logovanie'),
-                ('trainings',  'Tréningy'),
-                ('biometrics', 'Biometrika'),
-                ('charts',     'Analytika'),
-                ('ai_portal',  'AI'),
-                ('osobaky',    'Osobáky'),
-                ('heatmap',    'Heatmapa'),
-            ] %}
+        {% set nav_items = [
+            ('index',        'Domov'),
+            ('video_page',   'Video'),
+            ('hurdles_page', 'Prekážky'),
+            ('dashboard',    'Dashboard'),
+            ('log_data',     'Logovanie'),
+            ('trainings',    'Tréningy'),
+            ('biometrics',   'Biometrika'),
+            ('charts',       'Analytika'),
+            ('ai_portal',    'AI'),
+            ('osobaky',      'Osobáky'),
+            ('heatmap',      'Heatmapa'),
+        ] %}
+
+        <nav class="hidden lg:flex items-center gap-5">
             {% for endpoint, label in nav_items %}
             <a href="{{ url_for(endpoint) }}"
-               class="px-3 py-2 rounded-xl text-on-surface-variant hover:text-on-surface hover:bg-white/5 {{ 'active !text-primary' if request.endpoint == endpoint else '' }} transition-colors">
-                {{ label }}
-            </a>
+               class="navlink {{ 'active' if request.endpoint == endpoint else '' }}">{{ label }}</a>
             {% endfor %}
-
-            <a href="{{ url_for('strava_login') }}"
-               class="ml-2 btn-glow flex items-center gap-1.5 bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold ripple">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
-                </svg>
-                Strava
-            </a>
         </nav>
 
-        <!-- Mobile menu button -->
-        <button id="mobile-menu-btn" class="md:hidden p-2 rounded-xl hover:bg-white/5 transition-colors">
-            <span class="material-symbols-outlined text-on-surface-variant">menu</span>
+        <a href="{{ url_for('strava_login') }}"
+           class="hidden lg:flex items-center gap-2 border border-white/15 hover:border-white/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant hover:text-on-surface transition-colors">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="#fc4c02">
+                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+            </svg>
+            Strava
+        </a>
+
+        <button id="mobile-menu-btn" class="lg:hidden p-2 -mr-2 text-on-surface-variant hover:text-on-surface transition-colors">
+            <span class="material-symbols-outlined">menu</span>
         </button>
     </div>
 
-    <!-- Mobile nav -->
-    <div id="mobile-menu" class="hidden md:hidden border-t border-white/5 px-4 py-3 space-y-1">
+    <div id="mobile-menu" class="hidden lg:hidden border-t border-white/10 bg-[#0b0b0c]">
         {% for endpoint, label in nav_items %}
         <a href="{{ url_for(endpoint) }}"
-           class="block px-4 py-2.5 rounded-xl text-sm font-semibold text-on-surface-variant hover:text-on-surface hover:bg-white/5 {{ '!text-primary bg-white/3' if request.endpoint == endpoint else '' }} transition-colors">
-            {{ label }}
+           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] border-b border-white/5
+                  {{ 'text-on-surface' if request.endpoint == endpoint else 'text-on-surface-variant' }}">
+            {% if request.endpoint == endpoint %}<span style="color:var(--volt)">/ </span>{% endif %}{{ label }}
         </a>
         {% endfor %}
+        <a href="{{ url_for('strava_login') }}"
+           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]" style="color:#fc4c02">
+            Pripojiť Stravu
+        </a>
     </div>
 </header>
 
-<!-- ── CONTENT ── -->
-<div class="max-w-6xl mx-auto px-4 lg:px-6 relative z-10">
+<!-- ── OBSAH ── -->
+<div class="max-w-[1180px] mx-auto px-5">
 
-    <!-- Flash messages -->
     {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
-    <div class="mt-4 space-y-2">
+    <div class="mt-5 space-y-2">
         {% for category, msg in messages %}
-        <div class="flash-msg flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium
-            {% if category == 'success' %}bg-green-900/30 border border-green-500/20 text-green-300
-            {% elif category in ('danger','error') %}bg-red-900/30 border border-red-500/20 text-red-300
-            {% elif category == 'warning' %}bg-yellow-900/30 border border-yellow-500/20 text-yellow-300
-            {% else %}bg-surface-container-high border border-white/10 text-on-surface{% endif %}">
-            <span class="material-symbols-outlined text-base flex-shrink-0">
-                {% if category == 'success' %}check_circle
-                {% elif category in ('danger','error') %}error
-                {% elif category == 'warning' %}warning
-                {% else %}info{% endif %}
+        <div class="flash-msg flex items-center gap-3 px-4 py-3 text-sm bg-surface-container border-l-2
+            {% if category == 'success' %}border-[#879c26] text-on-surface
+            {% elif category in ('danger','error') %}border-[#e66767] text-on-surface
+            {% elif category == 'warning' %}border-[#c98500] text-on-surface
+            {% else %}border-white/25 text-on-surface{% endif %}">
+            <span class="eyebrow flex-shrink-0">
+                {% if category == 'success' %}OK
+                {% elif category in ('danger','error') %}Chyba
+                {% elif category == 'warning' %}Pozor
+                {% else %}Info{% endif %}
             </span>
-            {{ msg }}
-            <button onclick="this.parentElement.remove()" class="ml-auto opacity-50 hover:opacity-100 transition-opacity">
+            <span class="flex-1">{{ msg }}</span>
+            <button onclick="this.parentElement.remove()"
+                    class="text-on-surface-variant hover:text-on-surface transition-colors leading-none">
                 <span class="material-symbols-outlined text-sm">close</span>
             </button>
         </div>
@@ -492,92 +375,24 @@
     </div>
 </div>
 
+<!-- ── PÄTA ── -->
+<footer class="max-w-[1180px] mx-auto px-5 mt-16 mb-8 pt-5 border-t border-white/10
+               flex items-center justify-between flex-wrap gap-3">
+    <p class="eyebrow">AtletCoach · Analýza bežeckej techniky</p>
+    <p class="eyebrow">Maturitný projekt</p>
+</footer>
+
 {% block scripts %}{% endblock %}
 
 <script>
-    // Mobile menu toggle
     document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
         document.getElementById('mobile-menu').classList.toggle('hidden');
     });
 
-    // Cursor spotlight
-    const spotlight = document.getElementById('cursor-spotlight');
-    let mouseX = window.innerWidth / 2, mouseY = window.innerHeight / 2;
-    document.addEventListener('mousemove', e => {
-        mouseX = e.clientX; mouseY = e.clientY;
-        spotlight.style.left = mouseX + 'px';
-        spotlight.style.top  = mouseY + 'px';
-    });
-
-    // Scroll reveal
-    const revealObs = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
-                revealObs.unobserve(entry.target);
-            }
-        });
-    }, { threshold: 0.08, rootMargin: '0px 0px -40px 0px' });
-    document.querySelectorAll('.reveal, .reveal-left, .reveal-scale').forEach(el => revealObs.observe(el));
-
-    // Subtle tilt effect on glow-cards (skip on touch devices)
-    if (window.matchMedia('(hover: hover)').matches) {
-        document.querySelectorAll('.tilt-card').forEach(card => {
-            card.addEventListener('mousemove', e => {
-                const r = card.getBoundingClientRect();
-                const x = (e.clientX - r.left) / r.width  - 0.5;
-                const y = (e.clientY - r.top)  / r.height - 0.5;
-                card.style.transition = 'transform 0.1s ease';
-                card.style.transform = `perspective(600px) rotateY(${x * 6}deg) rotateX(${-y * 6}deg) translateY(-5px)`;
-            });
-            card.addEventListener('mouseleave', () => {
-                card.style.transition = 'transform 0.35s cubic-bezier(.22,.68,0,1.2)';
-                card.style.transform = '';
-            });
-        });
-    }
-
-    // Auto-dismiss flash messages after 4s
+    // Hlásenia zmiznú samé, ale dajú sa zavrieť aj ručne.
     setTimeout(() => {
-        document.querySelectorAll('.flash-msg').forEach(el => {
-            el.style.transition = 'opacity 0.4s ease, transform 0.4s ease';
-            el.style.opacity = '0';
-            el.style.transform = 'translateY(-8px)';
-            setTimeout(() => el.remove(), 400);
-        });
-    }, 4000);
-
-    // Count-up animation helper
-    function countUp(el, target, duration = 1200, decimals = 0) {
-        const start = 0;
-        const startTime = performance.now();
-        const suffix = el.dataset.suffix || '';
-        function update(now) {
-            const elapsed = now - startTime;
-            const progress = Math.min(elapsed / duration, 1);
-            const ease = 1 - Math.pow(1 - progress, 3); // ease-out cubic
-            const val = start + (target - start) * ease;
-            el.textContent = decimals > 0 ? val.toFixed(decimals) : Math.round(val);
-            if (progress < 1) requestAnimationFrame(update);
-            else el.textContent = decimals > 0 ? target.toFixed(decimals) : target;
-        }
-        requestAnimationFrame(update);
-    }
-
-    // Trigger count-up on all [data-count] elements when visible
-    const observer = new IntersectionObserver((entries) => {
-        entries.forEach(entry => {
-            if (entry.isIntersecting) {
-                const el = entry.target;
-                const target = parseFloat(el.dataset.count);
-                const decimals = parseFloat(el.dataset.decimals || '0');
-                countUp(el, target, 1000, decimals);
-                observer.unobserve(el);
-            }
-        });
-    }, { threshold: 0.3 });
-
-    document.querySelectorAll('[data-count]').forEach(el => observer.observe(el));
+        document.querySelectorAll('.flash-msg').forEach(el => el.remove());
+    }, 6000);
 </script>
 </body>
 </html>

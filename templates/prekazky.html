@@ -6,8 +6,8 @@
 
     <!-- ── Hlavička ── -->
     <div class="mb-8 page-content">
-        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Biomechanika</p>
-        <h2 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tight gradient-text">PREKÁŽKY</h2>
+        <p class="eyebrow mb-2">Biomechanika</p>
+        <h2 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tight text-on-surface">PREKÁŽKY</h2>
         <p class="text-sm text-on-surface-variant mt-2 max-w-2xl">
             Nahraj video prekážkového behu a appka odstopuje <strong class="text-on-surface">medzičasy medzi
             prekážkami</strong> (dopad za prekážkou → dopad za ďalšou) a spočíta <strong class="text-on-surface">kroky
@@ -306,7 +306,7 @@
     const fmt = (v, unit, dec) => (v === null || v === undefined) ? '—' : Number(v).toFixed(dec === undefined ? 0 : dec) + (unit || '');
     const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
     const sideBadge = code => '<span class="px-2 py-0.5 rounded-lg text-xs font-bold" style="background:' +
-        (code === 'L' ? 'rgba(255,120,82,0.18);color:#ff7852' : 'rgba(184,199,234,0.18);color:#b8c7ea') + '">' +
+        (code === 'L' ? 'rgba(135,156,38,0.35);color:#ece9e3' : 'rgba(57,135,229,0.35);color:#ece9e3') + '">' +
         (code === 'L' ? 'Ľavá' : 'Pravá') + '</span>';
 
     // ── výber súboru + prvý snímok ─────────────────────────────────
@@ -358,7 +358,7 @@
         const ctx = pickCanvas.getContext('2d');
         if (firstFrame) ctx.putImageData(firstFrame, 0, 0);
         const px = x * pickCanvas.width, py = y * pickCanvas.height, rad = Math.max(12, pickCanvas.height * 0.03);
-        ctx.strokeStyle = '#ff7852'; ctx.lineWidth = Math.max(2, pickCanvas.height * 0.006);
+        ctx.strokeStyle = '#d7f24a'; ctx.lineWidth = Math.max(2, pickCanvas.height * 0.006);
         ctx.beginPath(); ctx.arc(px, py, rad, 0, Math.PI * 2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(px - rad * 1.6, py); ctx.lineTo(px + rad * 1.6, py); ctx.moveTo(px, py - rad * 1.6); ctx.lineTo(px, py + rad * 1.6); ctx.stroke();
         pickClear.classList.remove('hidden');
@@ -567,7 +567,7 @@
         const labels = intervals.map(iv => 'P' + iv.from_hurdle + '→P' + iv.to_hurdle);
         chart = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Medzičas (s)', data: intervals.map(iv => iv.interval_s), backgroundColor: '#ff7852', borderRadius: 8, maxBarThickness: 70 }] },
+            data: { labels, datasets: [{ label: 'Medzičas (s)', data: intervals.map(iv => iv.interval_s), backgroundColor: '#879c26', borderRadius: 4, maxBarThickness: 70 }] },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 layout: { padding: { top: 26 } },
@@ -576,13 +576,13 @@
                     tooltip: { callbacks: { afterBody: items => { const iv = intervals[items[0].dataIndex]; return ['Kroky: ' + iv.steps_between, iv.speed_ms ? 'Rýchlosť: ' + iv.speed_ms + ' m/s' : '']; } } },
                 },
                 scales: {
-                    x: { ticks: { color: '#8896b3', font: { size: 11 } }, grid: { display: false } },
-                    y: { min: intervals.length ? Math.floor(Math.min(...intervals.map(iv => iv.interval_s)) * 0.85 * 10) / 10 : 0, ticks: { color: '#8896b3', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'sekundy', color: '#8896b3', font: { size: 10 } } },
+                    x: { ticks: { color: '#8b8b84', font: { size: 11 } }, grid: { display: false } },
+                    y: { min: intervals.length ? Math.floor(Math.min(...intervals.map(iv => iv.interval_s)) * 0.85 * 10) / 10 : 0, ticks: { color: '#8b8b84', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'sekundy', color: '#8b8b84', font: { size: 10 } } },
                 },
                 animation: { onComplete: (anim) => {
                     const ch = (anim && anim.chart) || chart;
                     if (!ch) return;
-                    const c = ch.ctx; c.save(); c.font = 'bold 12px Lexend, sans-serif'; c.fillStyle = '#e8ecf5'; c.textAlign = 'center';
+                    const c = ch.ctx; c.save(); c.font = 'bold 12px Archivo, sans-serif'; c.fillStyle = '#ece9e3'; c.textAlign = 'center';
                     ch.getDatasetMeta(0).data.forEach((bar, i) => { c.fillText(intervals[i].steps_between + ' krokov', bar.x, bar.y - 6); });
                     c.restore();
                 } },

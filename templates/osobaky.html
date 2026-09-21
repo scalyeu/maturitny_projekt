@@ -5,87 +5,82 @@
     .pr-card {
         position: relative;
         overflow: hidden;
-        background: linear-gradient(135deg, #0f1826 0%, #162033 100%);
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 1.5rem;
-        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+        background: #161617;
+        border: 1px solid rgba(236,233,227,0.10);
+        border-radius: 2px;
+        transition: border-color 0.12s linear;
     }
-    .pr-card:hover {
-        transform: translateY(-3px);
-        box-shadow: 0 16px 48px rgba(255,120,82,0.12);
-        border-color: rgba(255,120,82,0.25);
-    }
+    .pr-card:hover { border-color: rgba(215,242,74,0.45); }
     .pr-card .ghost-num {
         position: absolute;
-        right: 1.2rem;
-        top: 0.8rem;
-        font-family: 'Lexend', sans-serif;
+        right: 1rem;
+        top: 0.6rem;
+        font-family: 'Archivo', sans-serif;
         font-weight: 900;
         font-size: 4.5rem;
         line-height: 1;
-        color: rgba(255,255,255,0.04);
+        color: rgba(236,233,227,0.035);
         pointer-events: none;
         user-select: none;
-        letter-spacing: -0.04em;
+        letter-spacing: -0.05em;
     }
     .time-display {
-        font-family: 'Lexend', sans-serif;
+        font-family: 'Archivo', sans-serif;
         font-weight: 800;
-        font-size: 2.2rem;
+        font-size: 2.4rem;
         letter-spacing: -0.03em;
-        color: #ff7852;
+        font-variant-numeric: tabular-nums;
+        color: #d7f24a;
         line-height: 1;
     }
     .dist-label {
-        font-family: 'Lexend', sans-serif;
-        font-weight: 900;
-        letter-spacing: -0.04em;
+        font-family: 'Archivo', sans-serif;
+        font-weight: 800;
+        letter-spacing: -0.03em;
+        text-transform: uppercase;
         line-height: 1;
     }
     .meta-label {
-        font-size: 0.68rem;
-        font-weight: 700;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 10px;
+        font-weight: 500;
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        color: #8896b3;
+        letter-spacing: 0.14em;
+        color: #8b8b84;
     }
     .stat-block {
-        background: rgba(255,255,255,0.03);
-        border: 1px solid rgba(255,255,255,0.05);
-        border-radius: 0.75rem;
-        padding: 0.55rem 0.8rem;
+        background: transparent;
+        border: 0;
+        border-top: 1px solid rgba(236,233,227,0.10);
+        border-radius: 0;
+        padding: 0.5rem 0 0;
+        font-variant-numeric: tabular-nums;
     }
     .badge-pr {
-        background: linear-gradient(90deg, #ff7852, #ffa766);
-        color: white;
-        font-size: 0.58rem;
-        font-weight: 800;
-        letter-spacing: 0.12em;
+        background: #d7f24a;
+        color: #0b0b0c;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.14em;
         text-transform: uppercase;
-        padding: 2px 8px;
-        border-radius: 999px;
-        animation: pulse-pr 2.5s infinite;
+        padding: 2px 7px;
+        border-radius: 2px;
     }
-    @keyframes pulse-pr { 0%,100%{opacity:1} 50%{opacity:0.65} }
     .strava-pill {
         display: inline-flex; align-items: center; gap: 5px;
-        background: rgba(252,76,2,0.10);
-        border: 1px solid rgba(252,76,2,0.28);
-        border-radius: 999px; padding: 3px 10px;
-        font-size: 0.68rem; font-weight: 700;
-        color: #fc4c02; letter-spacing: 0.05em; text-transform: uppercase;
+        background: transparent;
+        border: 1px solid rgba(252,76,2,0.45);
+        border-radius: 2px; padding: 2px 8px;
+        font-family: 'IBM Plex Mono', monospace;
+        font-size: 9px; font-weight: 500;
+        color: #fc4c02; letter-spacing: 0.14em; text-transform: uppercase;
     }
     .no-pr {
-        border: 1.5px dashed rgba(255,255,255,0.07);
-        border-radius: 1.5rem;
+        border: 1px dashed rgba(236,233,227,0.14);
+        border-radius: 2px;
     }
-    .fade-in { animation: fadeUp 0.45s ease both; }
-    @keyframes fadeUp {
-        from { opacity:0; transform:translateY(14px); }
-        to   { opacity:1; transform:translateY(0); }
-    }
-    .c1{animation-delay:.04s} .c2{animation-delay:.1s}  .c3{animation-delay:.16s}
-    .c4{animation-delay:.22s} .c5{animation-delay:.28s} .c6{animation-delay:.34s}
+    .fade-in, .c1, .c2, .c3, .c4, .c5, .c6 { animation: none; opacity: 1; }
 </style>
 {% endblock %}
 
@@ -102,7 +97,7 @@
         <div>
             <p class="meta-label mb-1">Osobný rekord</p>
             <p class="dist-label text-4xl text-white">{{ dist_text }}
-                <span class="text-2xl font-semibold" style="color:#8896b3">{{ unit }}</span>
+                <span class="text-2xl font-semibold" style="color:#8b8b84">{{ unit }}</span>
             </p>
         </div>
         {% if r %}<span class="badge-pr">PR</span>{% endif %}

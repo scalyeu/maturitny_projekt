@@ -6,8 +6,8 @@
 
     <!-- ── Hlavička ── -->
     <div class="mb-8 page-content">
-        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Biomechanika</p>
-        <h2 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tight gradient-text">ANALÝZA VIDEA</h2>
+        <p class="eyebrow mb-2">Biomechanika</p>
+        <h2 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tight text-on-surface">ANALÝZA VIDEA</h2>
         <p class="text-sm text-on-surface-variant mt-2 max-w-2xl">
             Nahraj video svojho behu a appka z neho vyčíta <strong class="text-on-surface">čas kontaktu so zemou</strong>,
             letovú fázu, frekvenciu, dĺžku kroku, uhly v kĺboch a odhad rýchlosti — krok po kroku, pre ľavú aj pravú nohu.
@@ -408,7 +408,7 @@
         const ctx = pickCanvas.getContext('2d');
         if (firstFrame) ctx.putImageData(firstFrame, 0, 0);
         const px = x * pickCanvas.width, py = y * pickCanvas.height, rad = Math.max(12, pickCanvas.height * 0.03);
-        ctx.strokeStyle = '#ff7852'; ctx.lineWidth = Math.max(2, pickCanvas.height * 0.006);
+        ctx.strokeStyle = '#d7f24a'; ctx.lineWidth = Math.max(2, pickCanvas.height * 0.006);
         ctx.beginPath(); ctx.arc(px, py, rad, 0, Math.PI * 2); ctx.stroke();
         ctx.beginPath(); ctx.moveTo(px - rad * 1.6, py); ctx.lineTo(px + rad * 1.6, py);
         ctx.moveTo(px, py - rad * 1.6); ctx.lineTo(px, py + rad * 1.6); ctx.stroke();
@@ -709,7 +709,7 @@
         // porovnanie nôh
         const L = s.contact_left_ms, R = s.contact_right_ms;
         const maxv = Math.max(L || 0, R || 0) || 1;
-        document.getElementById('legs-box').innerHTML = [['Ľavá', L, '#ff7852'], ['Pravá', R, '#b8c7ea']]
+        document.getElementById('legs-box').innerHTML = [['Ľavá', L, '#879c26'], ['Pravá', R, '#3987e5']]
             .map(([name, val, col]) =>
                 '<div><div class="flex justify-between text-sm mb-1"><span class="font-semibold">' + name + '</span>' +
                 '<span class="font-headline font-bold">' + fmt(val, ' ms', 1) + '</span></div>' +
@@ -730,7 +730,7 @@
             return '<tr class="border-b border-white/5">' +
                 '<td class="py-2 pr-4 text-on-surface-variant">' + st.index + '</td>' +
                 '<td class="py-2 pr-4"><span class="px-2 py-0.5 rounded-lg text-xs font-bold" style="background:' +
-                    (st.side_code === 'L' ? 'rgba(255,120,82,0.18);color:#ff7852' : 'rgba(184,199,234,0.18);color:#b8c7ea') +
+                    (st.side_code === 'L' ? 'rgba(135,156,38,0.35);color:#ece9e3' : 'rgba(57,135,229,0.35);color:#ece9e3') +
                     '">' + st.side + '</span></td>' +
                 '<td class="py-2 pr-4 text-right text-on-surface-variant">' + st.touchdown_s.toFixed(3) + '</td>' +
                 '<td class="py-2 pr-4 text-right font-bold">' + fmt(st.contact_ms, ' ms', 1) + '</td>' +
@@ -760,7 +760,7 @@
                         type: 'bar',
                         label: 'Kontakt so zemou (ms)',
                         data: steps.map(s => s.contact_ms),
-                        backgroundColor: steps.map(s => s.side_code === 'L' ? '#ff7852' : '#b8c7ea'),
+                        backgroundColor: steps.map(s => s.side_code === 'L' ? '#879c26' : '#3987e5'),
                         borderRadius: 6,
                         order: 2,
                     },
@@ -768,8 +768,8 @@
                         type: 'line',
                         label: 'Letová fáza (ms)',
                         data: steps.map(s => s.flight_ms),
-                        borderColor: '#ffa766',
-                        backgroundColor: '#ffa766',
+                        borderColor: '#d55181',
+                        backgroundColor: '#d55181',
                         borderWidth: 2,
                         tension: 0.3,
                         pointRadius: 3,
@@ -782,7 +782,7 @@
                 responsive: true, maintainAspectRatio: false,
                 interaction: { mode: 'index', intersect: false },
                 plugins: {
-                    legend: { labels: { color: '#8896b3', boxWidth: 12, font: { size: 11 } } },
+                    legend: { labels: { color: '#8b8b84', boxWidth: 12, font: { size: 11 } } },
                     tooltip: {
                         callbacks: {
                             afterBody: items => {
@@ -806,12 +806,12 @@
                     },
                 },
                 scales: {
-                    x: { ticks: { color: '#8896b3', font: { size: 10 } }, grid: { display: false } },
+                    x: { ticks: { color: '#8b8b84', font: { size: 10 } }, grid: { display: false } },
                     y: {
                         beginAtZero: true,
-                        ticks: { color: '#8896b3', font: { size: 10 } },
+                        ticks: { color: '#8b8b84', font: { size: 10 } },
                         grid: { color: 'rgba(255,255,255,0.05)' },
-                        title: { display: true, text: 'milisekundy', color: '#8896b3', font: { size: 10 } },
+                        title: { display: true, text: 'milisekundy', color: '#8b8b84', font: { size: 10 } },
                     },
                 },
             },

@@ -3,8 +3,8 @@
 {% block content %}
 <main class="mt-6 pb-12">
     <div class="mb-8">
-        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Denník aktivít</p>
-        <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">SPRÁVA TRÉNINGOV</h2>
+        <p class="eyebrow mb-2">Denník aktivít</p>
+        <h2 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">SPRÁVA TRÉNINGOV</h2>
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
@@ -281,7 +281,7 @@ function generateIntervalInputs() {
     for (let i = 1; i <= count; i++) {
         container.innerHTML += `
         <div class="bg-surface-container rounded-xl p-3">
-            <label style="color: #ff7852; font-size:0.7rem; margin-bottom:4px; display:block;">Úsek ${i}</label>
+            <label style="color: #8b8b84; font-size:0.7rem; margin-bottom:4px; display:block;">Úsek ${i}</label>
             <input type="number" step="0.01" name="interval_times[]" placeholder="napr. 39.50" required>
         </div>`;
     }

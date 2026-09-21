@@ -4,35 +4,35 @@
 <style>
     .period-btn {
         padding: 6px 16px;
-        border-radius: 999px;
+        border-radius: 2px;
         font-size: 0.78rem;
         font-weight: 700;
         cursor: pointer;
         border: 1px solid rgba(255,255,255,0.08);
-        color: #8896b3;
+        color: #8b8b84;
         background: transparent;
         transition: all 0.2s;
-        font-family: 'Lexend', sans-serif;
+        font-family: 'Archivo', sans-serif;
     }
     .period-btn.active {
-        background: #ff7852;
-        border-color: #ff7852;
-        color: white;
+        background: #d7f24a;
+        border-color: #d7f24a;
+        color: #0b0b0c;
     }
     .stat-chip {
-        background: #0f1826;
+        background: #101011;
         border: 1px solid rgba(255,255,255,0.06);
         border-radius: 1rem;
         padding: 1rem 1.2rem;
     }
     .chart-card {
-        background: #0f1826;
+        background: #101011;
         border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 1.5rem;
+        border-radius: 2px;
         padding: 1.5rem;
     }
-    .trend-up   { color: #4ade80; }
-    .trend-down { color: #f87171; }
+    .trend-up   { color: #a8c22f; }
+    .trend-down { color: #e66767; }
 </style>
 {% endblock %}
 
@@ -42,8 +42,8 @@
     <!-- HEADER -->
     <div class="flex items-end justify-between flex-wrap gap-4">
         <div>
-            <p class="text-xs font-bold uppercase tracking-widest text-on-surface-variant mb-1">WHOOP · Biometrické dáta</p>
-            <h1 class="text-3xl font-extrabold tracking-tight" style="font-family:Lexend">HRV &amp; RHR Porovnanie</h1>
+            <p class="eyebrow mb-2">WHOOP · biometrické dáta</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">HRV &amp; RHR</h1>
             <p id="date-range-label" class="text-on-surface-variant text-sm mt-1">Načítavam dáta...</p>
         </div>
         <div class="flex gap-2 flex-wrap">
@@ -77,22 +77,22 @@
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="stat-chip">
                 <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">HRV priemer</p>
-                <p id="s-hrv-avg" class="text-2xl font-extrabold" style="font-family:Lexend;color:#ff7852">—</p>
+                <p id="s-hrv-avg" class="text-2xl font-extrabold" style="font-family:Archivo;color:#ece9e3">—</p>
                 <p class="text-xs text-on-surface-variant mt-0.5">ms · vybrané obdobie</p>
             </div>
             <div class="stat-chip">
                 <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">HRV predch. obdobie</p>
-                <p id="s-hrv-week" class="text-2xl font-extrabold text-on-surface" style="font-family:Lexend">—</p>
+                <p id="s-hrv-week" class="text-2xl font-extrabold text-on-surface" style="font-family:Archivo">—</p>
                 <p id="s-hrv-trend" class="text-xs text-on-surface-variant mt-0.5">porovnanie</p>
             </div>
             <div class="stat-chip">
                 <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">RHR priemer</p>
-                <p id="s-rhr-avg" class="text-2xl font-extrabold" style="font-family:Lexend;color:#b8c7ea">—</p>
+                <p id="s-rhr-avg" class="text-2xl font-extrabold" style="font-family:Archivo;color:#ece9e3">—</p>
                 <p class="text-xs text-on-surface-variant mt-0.5">bpm · vybrané obdobie</p>
             </div>
             <div class="stat-chip">
                 <p class="text-xs text-on-surface-variant font-bold uppercase tracking-wider mb-1">RHR predch. obdobie</p>
-                <p id="s-rhr-week" class="text-2xl font-extrabold text-on-surface" style="font-family:Lexend">—</p>
+                <p id="s-rhr-week" class="text-2xl font-extrabold text-on-surface" style="font-family:Archivo">—</p>
                 <p id="s-rhr-trend" class="text-xs text-on-surface-variant mt-0.5">porovnanie</p>
             </div>
         </div>
@@ -101,14 +101,14 @@
         <div class="chart-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                    <h2 class="font-bold text-on-surface" style="font-family:Lexend">Heart Rate Variability (HRV)</h2>
+                    <h2 class="font-bold text-on-surface" style="font-family:Archivo">Heart Rate Variability (HRV)</h2>
                     <p class="text-xs text-on-surface-variant mt-0.5">Denné hodnoty · MA7 · Dlhodobý priemer · Predch. obdobie</p>
                 </div>
                 <div class="flex gap-3 text-xs text-on-surface-variant">
-                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:rgba(255,120,82,0.6)"></span>Denné</span>
-                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:#ff7852"></span>MA7</span>
-                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:#8896b3;border-top:1px dashed #8896b3"></span>Priemer</span>
-                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:rgba(255,120,82,0.3)"></span>Predch.</span>
+                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:rgba(135,156,38,0.6)"></span>Denné</span>
+                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:#879c26"></span>MA7</span>
+                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:#8b8b84;border-top:1px dashed #8b8b84"></span>Priemer</span>
+                    <span class="flex items-center gap-1"><span style="display:inline-block;width:10px;height:2px;background:rgba(135,156,38,0.3)"></span>Predch.</span>
                 </div>
             </div>
             <div style="position:relative;height:260px">
@@ -120,7 +120,7 @@
         <div class="chart-card">
             <div class="flex items-center justify-between mb-4 flex-wrap gap-2">
                 <div>
-                    <h2 class="font-bold text-on-surface" style="font-family:Lexend">Pokojový Tep (RHR)</h2>
+                    <h2 class="font-bold text-on-surface" style="font-family:Archivo">Pokojový Tep (RHR)</h2>
                     <p class="text-xs text-on-surface-variant mt-0.5">Denné hodnoty · 7-dňový kĺzavý priemer</p>
                 </div>
                 <div class="flex gap-4 text-xs text-on-surface-variant">
@@ -136,7 +136,7 @@
         <!-- RECOVERY CHART -->
         <div class="chart-card">
             <div class="mb-4">
-                <h2 class="font-bold text-on-surface" style="font-family:Lexend">Recovery Score (%)</h2>
+                <h2 class="font-bold text-on-surface" style="font-family:Archivo">Recovery Score (%)</h2>
                 <p class="text-xs text-on-surface-variant mt-0.5">WHOOP denné recovery skóre</p>
             </div>
             <div style="position:relative;height:200px">
@@ -158,11 +158,11 @@ function buildOpts(yLabel) {
         plugins: {
             legend: { display: false },
             tooltip: {
-                backgroundColor: '#162033',
+                backgroundColor: '#1c1c1d',
                 borderColor: 'rgba(255,255,255,0.08)',
                 borderWidth: 1,
-                titleColor: '#8896b3',
-                bodyColor: '#dee5ff',
+                titleColor: '#8b8b84',
+                bodyColor: '#ece9e3',
                 padding: 10,
             }
         },
@@ -170,7 +170,7 @@ function buildOpts(yLabel) {
             x: {
                 grid: { color: 'rgba(255,255,255,0.04)' },
                 ticks: {
-                    color: '#8896b3',
+                    color: '#8b8b84',
                     font: { size: 11 },
                     maxTicksLimit: 10,
                     callback: function(val) {
@@ -181,8 +181,8 @@ function buildOpts(yLabel) {
             },
             y: {
                 grid: { color: 'rgba(255,255,255,0.04)' },
-                ticks: { color: '#8896b3', font: { size: 11 } },
-                title: yLabel ? { display: true, text: yLabel, color: '#8896b3', font: { size: 11 } } : { display: false }
+                ticks: { color: '#8b8b84', font: { size: 11 } },
+                title: yLabel ? { display: true, text: yLabel, color: '#8b8b84', font: { size: 11 } } : { display: false }
             }
         },
         elements: {
@@ -201,10 +201,10 @@ function initCharts() {
     hrvChart = new Chart(document.getElementById('hrvChart').getContext('2d'), {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'HRV denné',   data: [], borderColor: 'rgba(255,120,82,0.45)', backgroundColor: 'rgba(255,120,82,0.06)', fill: true, borderWidth: 1.5, pointRadius: 2 },
-            { label: 'MA7',         data: [], borderColor: '#ff7852', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 0 },
-            { label: 'Priemer',     data: [], borderColor: '#8896b3', backgroundColor: 'transparent', borderWidth: 1,   pointRadius: 0, borderDash: [6,4] },
-            { label: 'Predch. obd.', data: [], borderColor: 'rgba(255,120,82,0.2)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [3,3] },
+            { label: 'HRV denné',   data: [], borderColor: 'rgba(135,156,38,0.45)', backgroundColor: 'rgba(135,156,38,0.06)', fill: true, borderWidth: 1.5, pointRadius: 2 },
+            { label: 'MA7',         data: [], borderColor: '#879c26', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 0 },
+            { label: 'Priemer',     data: [], borderColor: '#8b8b84', backgroundColor: 'transparent', borderWidth: 1,   pointRadius: 0, borderDash: [6,4] },
+            { label: 'Predch. obd.', data: [], borderColor: 'rgba(135,156,38,0.2)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [3,3] },
         ]},
         options: buildOpts('ms')
     });
@@ -212,10 +212,10 @@ function initCharts() {
     rhrChart = new Chart(document.getElementById('rhrChart').getContext('2d'), {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'RHR denné',   data: [], borderColor: 'rgba(184,199,234,0.45)', backgroundColor: 'rgba(184,199,234,0.06)', fill: true, borderWidth: 1.5, pointRadius: 2 },
-            { label: 'MA7',         data: [], borderColor: '#b8c7ea', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 0 },
-            { label: 'Priemer',     data: [], borderColor: '#8896b3', backgroundColor: 'transparent', borderWidth: 1,   pointRadius: 0, borderDash: [6,4] },
-            { label: 'Predch. obd.', data: [], borderColor: 'rgba(184,199,234,0.2)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [3,3] },
+            { label: 'RHR denné',   data: [], borderColor: 'rgba(57,135,229,0.45)', backgroundColor: 'rgba(57,135,229,0.06)', fill: true, borderWidth: 1.5, pointRadius: 2 },
+            { label: 'MA7',         data: [], borderColor: '#3987e5', backgroundColor: 'transparent', borderWidth: 2.5, pointRadius: 0 },
+            { label: 'Priemer',     data: [], borderColor: '#8b8b84', backgroundColor: 'transparent', borderWidth: 1,   pointRadius: 0, borderDash: [6,4] },
+            { label: 'Predch. obd.', data: [], borderColor: 'rgba(57,135,229,0.2)', backgroundColor: 'transparent', borderWidth: 1.5, pointRadius: 0, borderDash: [3,3] },
         ]},
         options: buildOpts('bpm')
     });
@@ -223,8 +223,8 @@ function initCharts() {
     recChart = new Chart(document.getElementById('recChart').getContext('2d'), {
         type: 'line',
         data: { labels: [], datasets: [
-            { label: 'Recovery', data: [], borderColor: 'rgba(74,222,128,0.6)', backgroundColor: 'rgba(74,222,128,0.08)', fill: true, borderWidth: 1.5, pointRadius: 2 },
-            { label: 'MA7',      data: [], borderColor: '#4ade80', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0 },
+            { label: 'Recovery', data: [], borderColor: 'rgba(25,158,112,0.65)', backgroundColor: 'rgba(25,158,112,0.10)', fill: true, borderWidth: 1.5, pointRadius: 2 },
+            { label: 'MA7',      data: [], borderColor: '#199e70', backgroundColor: 'transparent', borderWidth: 2, pointRadius: 0 },
         ]},
         options: buildOpts('%')
     });
@@ -317,6 +317,9 @@ function loadData(days) {
                 requestAnimationFrame(() => {
                     initCharts();
                     _updateCharts(d);
+                    // Aj pri prvom načítaní treba doplniť súhrnné čísla —
+                    // inak zostali prázdne, kým si neklikol na iné obdobie.
+                    updateStats(d.stats, days);
                 });
                 return;
             }

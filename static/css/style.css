@@ -1,0 +1,192 @@
+:root {
+    --bg-color: #f0f0f5;
+    --card-bg: #ffffff;
+    --card-border: #d9d9e0;
+    --primary-color: #fc4c02; /* Strava Orange */
+    --primary-hover: #e04302;
+    --text-main: #242428;
+    --text-muted: #6d6d78;
+    --accent: #22d3ee;
+    --success: #10b981;
+    --danger: #ef4444;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Panel / Card Classes */
+.glass-panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.glass-header {
+    background: #ffffff;
+    border-bottom: 1px solid var(--card-border);
+    padding: 16px 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.brand {
+    font-size: 1.5rem;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    color: var(--primary-color) !important;
+}
+
+.nav-links a {
+    color: var(--text-muted);
+    text-decoration: none;
+    margin-left: 24px;
+    font-weight: 600;
+    transition: color 0.2s ease;
+}
+
+.nav-links a:hover, .nav-links a.active {
+    color: var(--primary-color);
+}
+
+/* Main Layout */
+.container {
+    max-width: 1200px;
+    margin: 40px auto;
+    padding: 0 24px;
+    width: 100%;
+}
+
+.dashboard-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 24px;
+    margin-top: 32px;
+}
+
+@media (max-width: 768px) {
+    .dashboard-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Forms and Inputs */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.form-control {
+    width: 100%;
+    background: #ffffff;
+    border: 1px solid var(--card-border);
+    color: var(--text-main);
+    padding: 12px 16px;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 3px rgba(252, 76, 2, 0.15);
+}
+
+/* Buttons */
+.btn {
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: all 0.2s ease;
+    text-align: center;
+    text-decoration: none;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+}
+
+.btn-accent {
+    background: var(--text-main);
+    color: white;
+}
+
+.btn-accent:hover {
+    background: #000000;
+}
+
+.btn-block {
+    width: 100%;
+}
+
+/* Typography Utilities */
+h1 {
+    font-size: 2.5rem;
+    margin-bottom: 8px;
+    letter-spacing: -1px;
+    color: var(--text-main);
+}
+
+h2 {
+    font-size: 1.5rem;
+    margin-bottom: 24px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+    color: var(--text-main);
+}
+
+.text-muted {
+    color: var(--text-muted);
+}
+
+/* Specific elements */
+.prediction-result {
+    text-align: center;
+    padding: 32px 0;
+}
+
+.time-display {
+    font-size: 5rem;
+    font-weight: 800;
+    letter-spacing: -2px;
+    color: var(--primary-color);
+    margin: 16px 0;
+    transition: opacity 0.3s ease;
+}

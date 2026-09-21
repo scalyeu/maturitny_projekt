@@ -1,0 +1,594 @@
+{% extends "base.html" %}
+{% block title %}Prekážky — Track AI{% endblock %}
+
+{% block content %}
+<main class="mt-6 pb-16">
+
+    <!-- ── Hlavička ── -->
+    <div class="mb-8 page-content">
+        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Biomechanika</p>
+        <h2 class="text-4xl md:text-5xl font-headline font-extrabold tracking-tight gradient-text">PREKÁŽKY</h2>
+        <p class="text-sm text-on-surface-variant mt-2 max-w-2xl">
+            Nahraj video prekážkového behu a appka odstopuje <strong class="text-on-surface">medzičasy medzi
+            prekážkami</strong> (dopad za prekážkou → dopad za ďalšou) a spočíta <strong class="text-on-surface">kroky
+            medzi prekážkami</strong>. Pri 400 m, 110 m a 100 m prekážkach vyjde aj rýchlosť medzi prekážkami —
+            vzdialenosť prekážok je daná pravidlami, takže netreba nič kalibrovať. Stačí bežné video, spomalený
+            záber netreba.
+        </p>
+    </div>
+
+    {% if not deps_ok %}
+    <div class="bg-red-900/30 border border-red-500/20 rounded-3xl p-5 mb-6 card-enter">
+        <p class="font-bold text-red-300 mb-1">Chýbajú knižnice pre analýzu videa</p>
+        <p class="text-sm text-red-200/80">{{ deps_msg }}</p>
+    </div>
+    {% endif %}
+
+    <div class="grid lg:grid-cols-3 gap-5">
+
+        <!-- ══ ĽAVÝ STĹPEC ══ -->
+        <div class="lg:col-span-1 space-y-5">
+            <div class="bg-surface-container-high rounded-3xl p-6 card-enter delay-1">
+                <h3 class="font-headline font-bold text-lg mb-4">Nahrať video</h3>
+                <form id="video-form" class="space-y-4">
+                    <div id="dropzone"
+                         class="border-2 border-dashed border-white/15 rounded-2xl p-6 text-center cursor-pointer
+                                hover:border-primary/50 hover:bg-white/5 transition-colors">
+                        <span class="material-symbols-outlined text-4xl text-on-surface-variant">videocam</span>
+                        <p class="text-sm font-semibold mt-2" id="drop-label">Klikni alebo sem pretiahni video</p>
+                        <p class="text-xs text-on-surface-variant mt-1">MP4, MOV — úsek s 2 a viac prekážkami</p>
+                        <input type="file" id="video-input" name="video" accept="video/*" class="hidden">
+                    </div>
+                    <div id="file-meta" class="hidden text-xs bg-surface-container rounded-2xl p-3 space-y-1"></div>
+
+                    <div id="pick-wrap" class="hidden">
+                        <p class="text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Kde je bežec?</p>
+                        <div class="relative rounded-2xl overflow-hidden bg-black">
+                            <canvas id="pick-canvas" class="w-full block cursor-crosshair"></canvas>
+                        </div>
+                        <p class="text-xs text-on-surface-variant mt-2">
+                            Pri pretekoch (viac bežcov) alebo zábere z tribúny <strong class="text-on-surface">klikni na
+                            svojho bežca</strong> v prvom snímku — inak si appka vyberie ľubovoľného človeka.
+                        </p>
+                        <button type="button" id="pick-clear" class="hidden text-xs text-primary mt-1">zrušiť výber</button>
+                        <input type="hidden" id="click_x"><input type="hidden" id="click_y">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Disciplína</label>
+                        <select id="discipline" class="w-full">
+                            <option value="400mH">400 m prekážky (35 m medzi prekážkami)</option>
+                            <option value="110mH">110 m prekážky muži (9,14 m)</option>
+                            <option value="100mH">100 m prekážky ženy (8,50 m)</option>
+                            <option value="other">iné / tréning (bez vzdialenosti)</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Popis merania</label>
+                        <input type="text" id="label" placeholder="napr. MSR finále, prekážky 3–5" maxlength="120">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Skutočné fps</label>
+                        <input type="number" id="fps_override" placeholder="auto" min="10" max="1000">
+                        <p class="text-xs text-on-surface-variant mt-1">
+                            Nechaj prázdne. Vyplň len pri spomalenom videu, ktoré telefón uložil s nesprávnym údajom —
+                            inak by medzičasy vyšli niekoľkonásobne dlhšie.
+                        </p>
+                    </div>
+
+                    <label class="flex items-center gap-2.5 text-sm cursor-pointer">
+                        <input type="checkbox" id="overlay" checked class="rounded">
+                        <span>Vytvoriť video s kostrou a označením prekážok</span>
+                    </label>
+
+                    <button type="submit" id="submit-btn"
+                            class="w-full btn-glow bg-primary hover:opacity-90 text-white font-bold py-3 rounded-2xl transition-opacity disabled:opacity-40 disabled:cursor-not-allowed"
+                            {% if not deps_ok %}disabled{% endif %}>
+                        Analyzovať prekážky
+                    </button>
+                </form>
+
+                <div id="progress-wrap" class="hidden mt-5">
+                    <div class="flex justify-between text-xs mb-2">
+                        <span id="progress-msg" class="text-on-surface-variant">Nahrávam…</span>
+                        <span id="progress-pct" class="font-bold text-primary">0 %</span>
+                    </div>
+                    <div class="h-2 bg-surface-container rounded-full overflow-hidden">
+                        <div id="progress-bar" class="h-full bg-primary rounded-full transition-all duration-300" style="width:0%"></div>
+                    </div>
+                    <p class="text-xs text-on-surface-variant mt-2">Dlhší záber s viacerými prekážkami môže trvať aj niekoľko minút.</p>
+                </div>
+                <div id="error-box" class="hidden mt-5 bg-red-900/30 border border-red-500/20 rounded-2xl p-4 text-sm text-red-200"></div>
+            </div>
+
+            <div class="bg-surface-container-high rounded-3xl p-6 card-enter delay-2">
+                <h3 class="font-headline font-bold text-lg mb-3 flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary">tips_and_updates</span>
+                    Ako natáčať prekážky
+                </h3>
+                <ul class="text-sm space-y-2.5 text-on-surface-variant">
+                    <li><strong class="text-on-surface">Aspoň dve prekážky</strong> v jednom zábere, s krokmi pred
+                        prvou aj za poslednou — inak sa medzičas nedá zmerať.</li>
+                    <li><strong class="text-on-surface">Bežné video stačí.</strong> Medzičas trvá sekundy, takže
+                        ±1 snímok pri 30 fps je chyba pod 1 %. Spomalený záber netreba.</li>
+                    <li><strong class="text-on-surface">Z boku, kamera sleduje bežca.</strong> Panorámovanie nevadí.
+                        Bežec musí byť stále celý v zábere vrátane chodidiel.</li>
+                    <li><strong class="text-on-surface">Preteky z tribúny:</strong> klikni na svojho bežca v prvom
+                        snímku.</li>
+                    <li><strong class="text-on-surface">Ako to funguje:</strong> prekážku prezradí let 3–4× dlhší
+                        než bežný krok. Kontakt pred ním je odraz, kontakt po ňom dopad. Medzičas = dopad → dopad,
+                        kroky = kontakty medzi dopadom a ďalším odrazom.</li>
+                </ul>
+            </div>
+
+            <div class="bg-surface-container-high rounded-3xl p-6 card-enter delay-3">
+                <h3 class="font-headline font-bold text-lg mb-3">História meraní</h3>
+                <div id="history-list" class="space-y-2">
+                    {% if history %}
+                        {% for h in history %}
+                        <div class="history-item flex items-center justify-between gap-2 p-3 rounded-2xl bg-surface-container hover:bg-surface-container-highest cursor-pointer transition-colors"
+                             data-id="{{ h.id }}">
+                            <div class="min-w-0">
+                                <p class="text-sm font-semibold truncate">{{ h.label or h.original_name or 'Meranie' }}</p>
+                                <p class="text-xs text-on-surface-variant">
+                                    {{ h.created_at.strftime('%d.%m.%Y %H:%M') }} · {{ h.discipline }} ·
+                                    {{ h.hurdles_detected or 0 }} prekážok{% if h.steps_pattern %} · {{ h.steps_pattern }}{% endif %}
+                                </p>
+                            </div>
+                            <div class="text-right flex-shrink-0">
+                                <p class="font-headline font-bold text-primary">
+                                    {{ '%.2f'|format(h.interval_mean_s) if h.interval_mean_s else '—' }}<span class="text-xs font-normal"> s</span>
+                                </p>
+                                <button class="delete-btn text-xs text-on-surface-variant hover:text-red-400" data-id="{{ h.id }}">zmazať</button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-sm text-on-surface-variant">Zatiaľ žiadne merania.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- ══ PRAVÝ STĹPEC ══ -->
+        <div class="lg:col-span-2">
+            <div id="empty-state" class="bg-surface-container-high rounded-3xl p-10 text-center card-enter delay-2">
+                <span class="material-symbols-outlined text-5xl text-on-surface-variant">stairs</span>
+                <p class="font-headline font-bold text-lg mt-3">Zatiaľ tu nič nie je</p>
+                <p class="text-sm text-on-surface-variant mt-1 max-w-md mx-auto">Nahraj video prekážok vľavo alebo klikni na meranie v histórii.</p>
+            </div>
+
+            <div id="results" class="hidden space-y-5">
+                <div id="accuracy-box" class="rounded-3xl p-5 border"></div>
+
+                <div id="warnings-box" class="hidden bg-yellow-900/20 border border-yellow-500/20 rounded-3xl p-5">
+                    <p class="font-bold text-yellow-300 text-sm mb-2 flex items-center gap-2">
+                        <span class="material-symbols-outlined text-base">warning</span> Na čo si dať pozor
+                    </p>
+                    <ul id="warnings-list" class="text-sm text-yellow-100/80 space-y-1.5 list-disc pl-5"></ul>
+                </div>
+
+                <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="stat-grid"></div>
+
+                <!-- medzičasy -->
+                <div class="bg-surface-container-high rounded-3xl p-5">
+                    <h3 class="font-headline font-bold text-lg mb-1">Medzičasy medzi prekážkami</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">
+                        Čas od dopadu za prekážkou po dopad za nasledujúcou. Číslo nad stĺpcom je počet krokov
+                        medzi prekážkami. Rastúce stĺpce = spomaľovanie.
+                    </p>
+                    <div style="height:260px"><canvas id="interval-chart"></canvas></div>
+                    <div class="overflow-x-auto mt-4">
+                        <table class="w-full text-sm whitespace-nowrap">
+                            <thead>
+                                <tr class="text-xs uppercase tracking-wider text-on-surface-variant border-b border-white/10">
+                                    <th class="text-left py-2 pr-4">Úsek</th>
+                                    <th class="text-right py-2 pr-4">Medzičas</th>
+                                    <th class="text-right py-2 pr-4">Kroky</th>
+                                    <th class="text-right py-2 pr-4">Rýchlosť</th>
+                                    <th class="text-left py-2 pl-4">Odraz pred ďalšou prekážkou</th>
+                                </tr>
+                            </thead>
+                            <tbody id="interval-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- dopady za prekážkami -->
+                <div class="bg-surface-container-high rounded-3xl p-5">
+                    <h3 class="font-headline font-bold text-lg mb-1">Dopady za prekážkami</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">
+                        Čas dopadu za každou prekážkou vo videu a od dopadu za prvou prekážkou (ako medzičasy zo stopiek).
+                    </p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm whitespace-nowrap">
+                            <thead>
+                                <tr class="text-xs uppercase tracking-wider text-on-surface-variant border-b border-white/10">
+                                    <th class="text-left py-2 pr-4">Prekážka</th>
+                                    <th class="text-left py-2 pr-4">Odrazová noha</th>
+                                    <th class="text-right py-2 pr-4">Dopad vo videu</th>
+                                    <th class="text-right py-2 pr-4">Od 1. prekážky</th>
+                                    <th class="text-right py-2">Kroky pred ňou</th>
+                                </tr>
+                            </thead>
+                            <tbody id="hurdle-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- hodnotenie rytmu -->
+                <div class="bg-surface-container-high rounded-3xl p-5">
+                    <div class="flex flex-wrap items-start justify-between gap-3 mb-3">
+                        <h3 class="font-headline font-bold text-lg">Hodnotenie rytmu</h3>
+                        <div id="tech-counts" class="flex gap-2 text-xs font-bold"></div>
+                    </div>
+                    <p id="tech-overall" class="text-sm mb-4"></p>
+                    <div id="tech-list" class="grid md:grid-cols-2 gap-3"></div>
+                </div>
+
+                <!-- AI tréner -->
+                <div class="bg-surface-container-high rounded-3xl p-5">
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h3 class="font-headline font-bold text-lg">AI tréner</h3>
+                            <p class="text-xs text-on-surface-variant">Medzičasy a rytmus krokov sa pošlú AI, ktorá napíše komentár s odporúčaniami.</p>
+                        </div>
+                        <button id="coach-btn" class="btn-glow bg-primary text-white text-sm font-bold px-4 py-2 rounded-xl disabled:opacity-40"
+                                {% if not groq_ok %}disabled title="Nastav GROQ_API_KEY v .env"{% endif %}>
+                            Okomentovať rytmus
+                        </button>
+                    </div>
+                    {% if not groq_ok %}
+                    <p class="text-xs text-yellow-300/80 mt-2">AI tréner potrebuje GROQ_API_KEY v súbore .env.</p>
+                    {% endif %}
+                    <div id="coach-box" class="hidden mt-4 text-sm leading-relaxed whitespace-pre-line bg-surface-container rounded-2xl p-4"></div>
+                </div>
+
+                <!-- kľúčové momenty -->
+                <div id="keyframes-box" class="hidden bg-surface-container-high rounded-3xl p-5">
+                    <h3 class="font-headline font-bold text-lg mb-1">Odraz · nad prekážkou · dopad</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">Snímky každej prekážky s vykreslenou kostrou — na kontrolu, že appka prekážku našla správne.</p>
+                    <div id="keyframes-grid" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3"></div>
+                </div>
+
+                <!-- video -->
+                <div id="overlay-box" class="hidden bg-surface-container-high rounded-3xl p-5">
+                    <h3 class="font-headline font-bold text-lg mb-3">Video s kostrou a označením prekážok</h3>
+                    <video id="overlay-video" controls playsinline class="w-full rounded-2xl bg-black"></video>
+                    <p class="text-xs text-on-surface-variant mt-2">Žlté značky na časovej osi sú prechody prekážok. Medzi prekážkami sa vypíše medzičas a počet krokov.</p>
+                </div>
+
+                <!-- všetky kroky -->
+                <div class="bg-surface-container-high rounded-3xl p-5">
+                    <h3 class="font-headline font-bold text-lg mb-1">Všetky kroky</h3>
+                    <p class="text-xs text-on-surface-variant mb-4">Každý dopad v poradí — tu si vieš skontrolovať, ktoré kroky sa rátali medzi prekážkami.</p>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm whitespace-nowrap">
+                            <thead>
+                                <tr class="text-xs uppercase tracking-wider text-on-surface-variant border-b border-white/10">
+                                    <th class="text-left py-2 pr-4">#</th>
+                                    <th class="text-left py-2 pr-4">Noha</th>
+                                    <th class="text-left py-2 pr-4">Rola</th>
+                                    <th class="text-right py-2">Dopad (s)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="steps-table"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</main>
+
+<script>
+(function () {
+    const form = document.getElementById('video-form');
+    const input = document.getElementById('video-input');
+    const dropzone = document.getElementById('dropzone');
+    const dropLabel = document.getElementById('drop-label');
+    const fileMeta = document.getElementById('file-meta');
+    const submitBtn = document.getElementById('submit-btn');
+    const progWrap = document.getElementById('progress-wrap');
+    const progBar = document.getElementById('progress-bar');
+    const progPct = document.getElementById('progress-pct');
+    const progMsg = document.getElementById('progress-msg');
+    const errorBox = document.getElementById('error-box');
+    const results = document.getElementById('results');
+    const emptyState = document.getElementById('empty-state');
+    const pickWrap = document.getElementById('pick-wrap');
+    const pickCanvas = document.getElementById('pick-canvas');
+    const pickClear = document.getElementById('pick-clear');
+    let chart = null, pollTimer = null, currentId = null, firstFrame = null;
+
+    const fmt = (v, unit, dec) => (v === null || v === undefined) ? '—' : Number(v).toFixed(dec === undefined ? 0 : dec) + (unit || '');
+    const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+    const sideBadge = code => '<span class="px-2 py-0.5 rounded-lg text-xs font-bold" style="background:' +
+        (code === 'L' ? 'rgba(255,120,82,0.18);color:#ff7852' : 'rgba(184,199,234,0.18);color:#b8c7ea') + '">' +
+        (code === 'L' ? 'Ľavá' : 'Pravá') + '</span>';
+
+    // ── výber súboru + prvý snímok ─────────────────────────────────
+    dropzone.addEventListener('click', () => input.click());
+    ['dragenter', 'dragover'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('border-primary/70', 'bg-white/5'); }));
+    ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('border-primary/70', 'bg-white/5'); }));
+    dropzone.addEventListener('drop', e => { if (e.dataTransfer.files.length) { input.files = e.dataTransfer.files; showFile(); } });
+    input.addEventListener('change', showFile);
+
+    function showFile() {
+        const f = input.files[0];
+        if (!f) return;
+        dropLabel.textContent = f.name;
+        fileMeta.classList.remove('hidden');
+        fileMeta.innerHTML = '<div class="flex justify-between"><span class="text-on-surface-variant">Veľkosť</span><span>' + (f.size / 1048576).toFixed(1) + ' MB</span></div>';
+        clearPick();
+        const v = document.createElement('video');
+        v.preload = 'auto'; v.muted = true; v.playsInline = true;
+        v.onloadedmetadata = () => {
+            fileMeta.innerHTML += '<div class="flex justify-between"><span class="text-on-surface-variant">Dĺžka</span><span>' + v.duration.toFixed(1) + ' s</span></div>' +
+                '<div class="flex justify-between"><span class="text-on-surface-variant">Rozlíšenie</span><span>' + v.videoWidth + '×' + v.videoHeight + '</span></div>';
+            v.currentTime = Math.min(0.1, v.duration / 2);
+        };
+        v.onseeked = () => {
+            try {
+                pickCanvas.width = v.videoWidth; pickCanvas.height = v.videoHeight;
+                const ctx = pickCanvas.getContext('2d');
+                ctx.drawImage(v, 0, 0);
+                firstFrame = ctx.getImageData(0, 0, pickCanvas.width, pickCanvas.height);
+                pickWrap.classList.remove('hidden');
+            } catch (e) { }
+            URL.revokeObjectURL(v.src);
+        };
+        v.onerror = () => pickWrap.classList.add('hidden');
+        v.src = URL.createObjectURL(f);
+    }
+    function clearPick() {
+        document.getElementById('click_x').value = '';
+        document.getElementById('click_y').value = '';
+        pickClear.classList.add('hidden');
+        if (firstFrame) pickCanvas.getContext('2d').putImageData(firstFrame, 0, 0);
+    }
+    pickClear.addEventListener('click', clearPick);
+    pickCanvas.addEventListener('click', e => {
+        const r = pickCanvas.getBoundingClientRect();
+        const x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        document.getElementById('click_x').value = x.toFixed(4);
+        document.getElementById('click_y').value = y.toFixed(4);
+        const ctx = pickCanvas.getContext('2d');
+        if (firstFrame) ctx.putImageData(firstFrame, 0, 0);
+        const px = x * pickCanvas.width, py = y * pickCanvas.height, rad = Math.max(12, pickCanvas.height * 0.03);
+        ctx.strokeStyle = '#ff7852'; ctx.lineWidth = Math.max(2, pickCanvas.height * 0.006);
+        ctx.beginPath(); ctx.arc(px, py, rad, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.moveTo(px - rad * 1.6, py); ctx.lineTo(px + rad * 1.6, py); ctx.moveTo(px, py - rad * 1.6); ctx.lineTo(px, py + rad * 1.6); ctx.stroke();
+        pickClear.classList.remove('hidden');
+    });
+
+    // ── odoslanie ───────────────────────────────────────────────────
+    form.addEventListener('submit', e => {
+        e.preventDefault();
+        const f = input.files[0];
+        if (!f) { showError('Najprv vyber video.'); return; }
+        const fd = new FormData();
+        fd.append('video', f);
+        fd.append('label', document.getElementById('label').value);
+        fd.append('fps_override', document.getElementById('fps_override').value);
+        fd.append('discipline', document.getElementById('discipline').value);
+        fd.append('click_x', document.getElementById('click_x').value);
+        fd.append('click_y', document.getElementById('click_y').value);
+        fd.append('overlay', document.getElementById('overlay').checked ? '1' : '0');
+        errorBox.classList.add('hidden');
+        submitBtn.disabled = true;
+        progWrap.classList.remove('hidden');
+        setProgress(2, 'Nahrávam video na server…');
+        fetch('/api/hurdles/analyze', { method: 'POST', body: fd })
+            .then(r => r.json().then(j => ({ ok: r.ok, j })))
+            .then(({ ok, j }) => { if (!ok) throw new Error(j.error || 'Neznáma chyba'); setProgress(5, 'Spúšťam analýzu…'); poll(j.job_id); })
+            .catch(err => { showError(err.message); reset(); });
+    });
+    function poll(jobId) {
+        clearInterval(pollTimer);
+        pollTimer = setInterval(() => {
+            fetch('/api/video/job/' + jobId)
+                .then(r => r.json().then(j => ({ ok: r.ok, j })))
+                .then(({ ok, j }) => {
+                    if (!ok) throw new Error(j.error || 'Úloha zlyhala');
+                    if (j.state === 'error') { clearInterval(pollTimer); showError(j.message); reset(); return; }
+                    setProgress(j.progress || 0, j.message || 'Pracujem…');
+                    if (j.state === 'done') {
+                        clearInterval(pollTimer);
+                        setProgress(100, 'Hotovo');
+                        render(j.result);
+                        addHistoryItem(j.result);
+                        setTimeout(() => { progWrap.classList.add('hidden'); reset(); }, 900);
+                    }
+                })
+                .catch(err => { clearInterval(pollTimer); showError(err.message); reset(); });
+        }, 700);
+    }
+    function setProgress(p, msg) { progBar.style.width = p + '%'; progPct.textContent = Math.round(p) + ' %'; progMsg.textContent = msg; }
+    function reset() { submitBtn.disabled = false; }
+    function showError(msg) { errorBox.textContent = msg; errorBox.classList.remove('hidden'); progWrap.classList.add('hidden'); }
+
+    // ── história ────────────────────────────────────────────────────
+    function bindHistory(el) {
+        el.addEventListener('click', ev => {
+            if (ev.target.classList.contains('delete-btn')) return;
+            fetch('/api/hurdles/result/' + el.dataset.id).then(r => r.json()).then(d => { if (d.error) showError(d.error); else render(d); })
+                .catch(err => showError('Nepodarilo sa načítať meranie: ' + err.message));
+        });
+        const btn = el.querySelector('.delete-btn');
+        if (btn) btn.addEventListener('click', ev => {
+            ev.stopPropagation();
+            fetch('/api/hurdles/delete/' + btn.dataset.id, { method: 'POST' }).then(() => window.location.reload());
+        });
+    }
+    document.querySelectorAll('.history-item').forEach(bindHistory);
+    function addHistoryItem(d) {
+        if (!d || !d.analysis_id) return;
+        const list = document.getElementById('history-list');
+        const empty = list.querySelector('p'); if (empty) empty.remove();
+        const el = document.createElement('div');
+        el.className = 'history-item flex items-center justify-between gap-2 p-3 rounded-2xl bg-surface-container hover:bg-surface-container-highest cursor-pointer transition-colors';
+        el.dataset.id = d.analysis_id;
+        const label = document.getElementById('label').value || (input.files[0] ? input.files[0].name : 'Meranie');
+        el.innerHTML = '<div class="min-w-0"><p class="text-sm font-semibold truncate">' + esc(label) + '</p>' +
+            '<p class="text-xs text-on-surface-variant">práve teraz · ' + esc(d.discipline) + ' · ' + d.summary.hurdles_detected + ' prekážok' +
+            (d.summary.steps_pattern_text ? ' · ' + esc(d.summary.steps_pattern_text) : '') + '</p></div>' +
+            '<div class="text-right flex-shrink-0"><p class="font-headline font-bold text-primary">' + fmt(d.summary.interval_mean_s, '', 2) +
+            '<span class="text-xs font-normal"> s</span></p><button class="delete-btn text-xs text-on-surface-variant hover:text-red-400" data-id="' + d.analysis_id + '">zmazať</button></div>';
+        list.prepend(el); bindHistory(el);
+    }
+
+    // ── AI tréner ───────────────────────────────────────────────────
+    const coachBtn = document.getElementById('coach-btn'), coachBox = document.getElementById('coach-box');
+    coachBtn.addEventListener('click', () => {
+        if (!currentId) return;
+        coachBtn.disabled = true; coachBox.classList.remove('hidden'); coachBox.textContent = 'AI tréner číta tvoje medzičasy…';
+        fetch('/api/coach/hurdles/' + currentId, { method: 'POST' }).then(r => r.json())
+            .then(j => { coachBox.textContent = j.error ? ('Chyba: ' + j.error) : j.reply; coachBtn.disabled = false; })
+            .catch(err => { coachBox.textContent = 'Chyba: ' + err.message; coachBtn.disabled = false; });
+    });
+
+    // ── vykreslenie ─────────────────────────────────────────────────
+    function tile(label, value, sub, accent) {
+        return '<div class="bg-surface-container-high rounded-2xl p-4 hover-lift"><p class="text-xs uppercase tracking-wider text-on-surface-variant mb-1">' + label + '</p>' +
+            '<p class="font-headline font-extrabold text-2xl ' + (accent ? 'text-primary' : 'text-on-surface') + '">' + value + '</p>' +
+            (sub ? '<p class="text-xs text-on-surface-variant mt-0.5">' + sub + '</p>' : '') + '</div>';
+    }
+    const STATUS = {
+        problem: { cls: 'border-red-500/30 bg-red-900/15', dot: 'bg-red-400', txt: 'text-red-300' },
+        pozor:   { cls: 'border-yellow-500/30 bg-yellow-900/15', dot: 'bg-yellow-400', txt: 'text-yellow-300' },
+        ok:      { cls: 'border-green-500/20 bg-green-900/10', dot: 'bg-green-400', txt: 'text-green-300' },
+        info:    { cls: 'border-white/10 bg-white/5', dot: 'bg-gray-400', txt: 'text-on-surface-variant' },
+    };
+    function renderTechnique(t) {
+        const list = document.getElementById('tech-list'), overall = document.getElementById('tech-overall'), counts = document.getElementById('tech-counts');
+        if (!t || !t.findings || !t.findings.length) { list.innerHTML = ''; overall.textContent = (t && t.error) ? t.error : 'Na hodnotenie treba aspoň dve prekážky v zábere.'; counts.innerHTML = ''; return; }
+        overall.textContent = t.overall;
+        const c = t.counts || {};
+        counts.innerHTML = '<span class="px-2 py-1 rounded-lg bg-red-900/30 text-red-300">' + (c.problem || 0) + ' riešiť</span>' +
+            '<span class="px-2 py-1 rounded-lg bg-yellow-900/30 text-yellow-300">' + (c.pozor || 0) + ' sledovať</span>' +
+            '<span class="px-2 py-1 rounded-lg bg-green-900/30 text-green-300">' + (c.ok || 0) + ' v norme</span>';
+        list.innerHTML = t.findings.map(f => {
+            const s = STATUS[f.status] || STATUS.info;
+            return '<div class="rounded-2xl border p-4 ' + s.cls + '"><div class="flex items-center justify-between gap-2 mb-1">' +
+                '<p class="font-semibold text-sm flex items-center gap-2"><span class="inline-block w-2 h-2 rounded-full ' + s.dot + '"></span>' + esc(f.label) + '</p>' +
+                '<p class="font-headline font-bold ' + s.txt + '">' + esc(f.value_text) + '</p></div>' +
+                '<p class="text-xs text-on-surface-variant mb-1.5">Referencia: ' + esc(f.reference) + '</p><p class="text-sm">' + esc(f.text) + '</p>' +
+                (f.tip && f.status !== 'ok' ? '<p class="text-xs text-on-surface-variant mt-2"><span class="text-primary font-bold">Tip:</span> ' + esc(f.tip) + '</p>' : '') + '</div>';
+        }).join('');
+    }
+    function renderKeyframes(d) {
+        const box = document.getElementById('keyframes-box'), grid = document.getElementById('keyframes-grid');
+        const ks = (d.keyframes || []).filter(k => k.url);
+        if (!ks.length) { box.classList.add('hidden'); grid.innerHTML = ''; return; }
+        box.classList.remove('hidden');
+        grid.innerHTML = ks.map(k =>
+            '<a href="' + k.url + '" target="_blank" class="block rounded-2xl overflow-hidden bg-surface-container hover-lift"><img src="' + k.url + '" alt="' + esc(k.label) + '" class="w-full block" loading="lazy">' +
+            '<div class="p-3"><p class="text-sm font-semibold">' + esc(k.label) + '</p><p class="text-xs text-on-surface-variant">' + k.time_s.toFixed(2) + ' s</p></div></a>'
+        ).join('');
+    }
+
+    function render(d) {
+        emptyState.classList.add('hidden'); results.classList.remove('hidden');
+        const s = d.summary, v = d.video;
+        currentId = d.analysis_id || null;
+        coachBox.classList.toggle('hidden', !d.coach_comment); coachBox.textContent = d.coach_comment || '';
+
+        // Medzičasy trvajú sekundy, takže ±1 snímok je aj pri bežnom videu chyba pod 1 %.
+        const frameMs = d.accuracy.frame_ms || (1000 / v.fps);
+        const good = v.fps >= 24;
+        const box = document.getElementById('accuracy-box');
+        box.className = 'rounded-3xl p-5 border ' + (good ? 'bg-green-900/20 border-green-500/20' : 'bg-yellow-900/20 border-yellow-500/20');
+        box.innerHTML = '<div class="flex items-start gap-3"><span class="material-symbols-outlined ' + (good ? 'text-green-400' : 'text-yellow-400') + '">' + (good ? 'verified' : 'error') + '</span><div>' +
+            '<p class="font-bold text-sm ' + (good ? 'text-green-300' : 'text-yellow-300') + '">' + esc(s.discipline_label) + ' · ' + s.hurdles_detected + ' prekáž' + (s.hurdles_detected === 1 ? 'ka' : (s.hurdles_detected < 5 ? 'ky' : 'ok')) +
+            ' v zábere · medzičasy presné na ± ' + Math.round(frameMs) + ' ms (1 snímok)</p>' +
+            '<p class="text-xs text-on-surface-variant mt-2">Video: ' + v.fps + ' fps · ' + v.duration_s + ' s · ' + v.width + '×' + v.height + ' · kostra rozpoznaná na ' + Math.round(v.detected_ratio * 100) + ' % snímok' +
+            (v.crop_ratio ? ' · bežec priblížený na ' + Math.round(v.crop_ratio * 100) + ' % snímok' : '') + '</p></div></div>';
+
+        const wBox = document.getElementById('warnings-box'), wList = document.getElementById('warnings-list');
+        if (d.warnings && d.warnings.length) { wBox.classList.remove('hidden'); wList.innerHTML = d.warnings.map(w => '<li>' + esc(w) + '</li>').join(''); }
+        else wBox.classList.add('hidden');
+
+        const sidesTxt = s.takeoff_left + '× ľavá, ' + s.takeoff_right + '× pravá';
+        document.getElementById('stat-grid').innerHTML = [
+            tile('Medzičas', s.interval_mean_s !== null ? fmt(s.interval_mean_s, ' s', 2) : '—', s.interval_sd_s !== null ? '± ' + fmt(s.interval_sd_s, ' s', 2) + ' medzi úsekmi' : 'dopad → dopad', true),
+            tile('Kroky medzi prekážkami', s.steps_pattern_text || '—', 'rytmus'),
+            tile('Rýchlosť medzi prekážkami', s.speed_between_ms_mean !== null ? fmt(s.speed_between_ms_mean, ' m/s', 2) : '—', s.speed_between_kmh_mean !== null ? fmt(s.speed_between_kmh_mean, ' km/h', 1) + ' · z ' + s.spacing_m + ' m' : 'zvoľ disciplínu'),
+            tile('Zmena medzičasu', s.interval_trend_pct !== null && s.interval_trend_pct !== undefined ? (s.interval_trend_pct > 0 ? '+' : '') + fmt(s.interval_trend_pct, ' %', 1) : '—', 'prvý → posledný úsek'),
+            tile('Odrazová noha', 'Ľ ' + s.takeoff_left + ' · P ' + s.takeoff_right, sidesTxt + (s.takeoff_left && s.takeoff_right ? ' · strieda obe' : ' · stále tá istá')),
+            tile('Prekážok v zábere', fmt(s.hurdles_detected, ''), s.contacts_detected + ' krokov celkom'),
+        ].join('');
+
+        // medzičasy
+        drawChart(d.intervals || []);
+        const hurdleOf = {};
+        (d.hurdles || []).forEach(h => { hurdleOf[h.index] = h; });
+        document.getElementById('interval-table').innerHTML = (d.intervals || []).map(iv => {
+            const h2 = hurdleOf[iv.to_hurdle] || {};
+            return '<tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold">P' + iv.from_hurdle + ' → P' + iv.to_hurdle + '</td>' +
+            '<td class="py-2 pr-4 text-right font-bold text-primary">' + fmt(iv.interval_s, ' s', 2) + '</td>' +
+            '<td class="py-2 pr-4 text-right">' + iv.steps_between + '</td>' +
+            '<td class="py-2 pr-4 text-right">' + (iv.speed_ms ? fmt(iv.speed_ms, ' m/s', 2) : '—') + '</td>' +
+            '<td class="py-2 pl-4">' + (h2.takeoff_side ? sideBadge(h2.takeoff_side) : '—') + '</td></tr>';
+        }).join('') || '<tr><td colspan="5" class="py-2 text-on-surface-variant">Na medzičas treba aspoň dve prekážky v zábere.</td></tr>';
+
+        // dopady za prekážkami
+        const stepsBefore = {};
+        (d.intervals || []).forEach(iv => { stepsBefore[iv.to_hurdle] = iv.steps_between; });
+        document.getElementById('hurdle-table').innerHTML = (d.hurdles || []).map((h, i) =>
+            '<tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold">P' + h.index + '</td>' +
+            '<td class="py-2 pr-4">' + sideBadge(h.takeoff_side) + '</td>' +
+            '<td class="py-2 pr-4 text-right text-on-surface-variant">' + fmt(h.landing_s, ' s', 2) + '</td>' +
+            '<td class="py-2 pr-4 text-right font-bold">' + (s.touchdown_rel_s && s.touchdown_rel_s[i] !== undefined ? (i === 0 ? '0.00 s' : '+' + fmt(s.touchdown_rel_s[i], ' s', 2)) : '—') + '</td>' +
+            '<td class="py-2 text-right">' + (stepsBefore[h.index] !== undefined ? stepsBefore[h.index] : '—') + '</td></tr>'
+        ).join('');
+
+        renderTechnique(d.technique);
+        renderKeyframes(d);
+
+        const oBox = document.getElementById('overlay-box'), oVid = document.getElementById('overlay-video');
+        if (d.overlay_url) { oBox.classList.remove('hidden'); oVid.src = d.overlay_url; } else { oBox.classList.add('hidden'); oVid.removeAttribute('src'); }
+
+        document.getElementById('steps-table').innerHTML = (d.steps || []).map(st =>
+            '<tr class="border-b border-white/5' + (st.role_code ? ' bg-white/5' : '') + '"><td class="py-2 pr-4 text-on-surface-variant">' + st.index + '</td>' +
+            '<td class="py-2 pr-4">' + sideBadge(st.side_code) + '</td>' +
+            '<td class="py-2 pr-4 ' + (st.role_code === 'odraz' ? 'text-yellow-300' : st.role_code === 'dopad' ? 'text-primary' : 'text-on-surface-variant') + ' font-semibold">' + esc(st.role) + '</td>' +
+            '<td class="py-2 text-right text-on-surface-variant">' + st.touchdown_s.toFixed(2) + '</td></tr>'
+        ).join('');
+
+        results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
+    function drawChart(intervals) {
+        const ctx = document.getElementById('interval-chart');
+        if (chart) chart.destroy();
+        const labels = intervals.map(iv => 'P' + iv.from_hurdle + '→P' + iv.to_hurdle);
+        chart = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: [{ label: 'Medzičas (s)', data: intervals.map(iv => iv.interval_s), backgroundColor: '#ff7852', borderRadius: 8, maxBarThickness: 70 }] },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                layout: { padding: { top: 26 } },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: { callbacks: { afterBody: items => { const iv = intervals[items[0].dataIndex]; return ['Kroky: ' + iv.steps_between, iv.speed_ms ? 'Rýchlosť: ' + iv.speed_ms + ' m/s' : '']; } } },
+                },
+                scales: {
+                    x: { ticks: { color: '#8896b3', font: { size: 11 } }, grid: { display: false } },
+                    y: { min: intervals.length ? Math.floor(Math.min(...intervals.map(iv => iv.interval_s)) * 0.85 * 10) / 10 : 0, ticks: { color: '#8896b3', font: { size: 10 } }, grid: { color: 'rgba(255,255,255,0.05)' }, title: { display: true, text: 'sekundy', color: '#8896b3', font: { size: 10 } } },
+                },
+                animation: { onComplete: (anim) => {
+                    const ch = (anim && anim.chart) || chart;
+                    if (!ch) return;
+                    const c = ch.ctx; c.save(); c.font = 'bold 12px Lexend, sans-serif'; c.fillStyle = '#e8ecf5'; c.textAlign = 'center';
+                    ch.getDatasetMeta(0).data.forEach((bar, i) => { c.fillText(intervals[i].steps_between + ' krokov', bar.x, bar.y - 6); });
+                    c.restore();
+                } },
+            },
+        });
+    }
+})();
+</script>
+{% endblock %}

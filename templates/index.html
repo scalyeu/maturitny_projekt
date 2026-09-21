@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="py-8 space-y-8">
+
+    <!-- ── Hero header ── -->
+    <div class="card-enter delay-1 flex items-end justify-between flex-wrap gap-4">
+        <div>
+            <div class="inline-flex items-center gap-2 mb-3 px-3 py-1 rounded-full bg-primary/10 border border-primary/15">
+                <span class="w-1.5 h-1.5 rounded-full bg-primary pulse-dot"></span>
+                <p class="text-[10px] font-bold uppercase tracking-widest text-primary font-headline">Track AI · Analýza bežeckej techniky</p>
+            </div>
+            <h1 class="text-4xl md:text-5xl font-headline font-black tracking-tight leading-[1.25] pt-1">
+                <span class="gradient-text">Vitaj späť</span>,
+                <span class="text-on-surface">poďme makať</span>
+            </h1>
+            <p class="text-on-surface-variant text-sm md:text-base mt-3 max-w-md">
+                Nahraj video svojho behu a zmeraj si techniku — kontakt so zemou, frekvenciu
+                krokov aj asymetriu. Biometrika a tréningy k tomu dávajú kontext.
+            </p>
+        </div>
+        <div class="flex gap-3 flex-wrap">
+            <a href="{{ url_for('video_page') }}"
+               class="btn-glow ripple flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-2xl text-sm font-bold">
+                <span class="material-symbols-outlined text-base">videocam</span>
+                Analyzovať video
+            </a>
+            {% if not strava_logged_in %}
+            <a href="{{ url_for('strava_login') }}"
+               class="ripple flex items-center gap-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface px-5 py-2.5 rounded-2xl text-sm font-bold border border-white/8 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                </svg>
+                Pripojiť Stravu
+            </a>
+            {% else %}
+            <a href="{{ url_for('dashboard') }}"
+               class="ripple flex items-center gap-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface px-5 py-2.5 rounded-2xl text-sm font-bold border border-white/8 transition-colors">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="#fc4c02">
+                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                </svg>
+                Strava Dashboard
+            </a>
+            {% endif %}
+            <a href="{{ url_for('ai_portal') }}"
+               class="ripple flex items-center gap-2 bg-surface-container-high hover:bg-surface-container-highest text-on-surface px-5 py-2.5 rounded-2xl text-sm font-bold border border-white/8 transition-colors">
+                <span class="material-symbols-outlined text-primary text-base">smart_toy</span>
+                AI Coach
+            </a>
+        </div>
+    </div>
+
+    <!-- ── Posledná analýza videa ── -->
+    <div class="card-enter delay-2 bg-surface-container-high rounded-3xl p-6 border border-white/5">
+        {% if last_video %}
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div>
+                <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">
+                    Posledná analýza techniky
+                </p>
+                <p class="font-headline font-black text-2xl text-on-surface">
+                    {{ last_video.label or 'Meranie' }}
+                </p>
+                <p class="text-xs text-on-surface-variant mt-1">
+                    {{ last_video.created_at.strftime('%d.%m.%Y %H:%M') }} ·
+                    {{ last_video.steps_detected or 0 }} krokov ·
+                    {{ '%.0f'|format(last_video.fps or 0) }} fps
+                    {% if last_video.fps and last_video.fps < 100 %}
+                    <span class="text-yellow-400">· presnosť len orientačná</span>
+                    {% endif %}
+                </p>
+            </div>
+            <div class="flex gap-6">
+                <div>
+                    <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Kontakt</p>
+                    <p class="font-headline font-black text-3xl text-primary">
+                        {{ '%.0f'|format(last_video.contact_ms_mean) if last_video.contact_ms_mean else '—' }}<span class="text-sm font-normal"> ms</span>
+                    </p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Kadencia</p>
+                    <p class="font-headline font-black text-3xl text-on-surface">
+                        {{ '%.0f'|format(last_video.cadence_spm) if last_video.cadence_spm else '—' }}
+                    </p>
+                </div>
+                <div>
+                    <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Asymetria</p>
+                    <p class="font-headline font-black text-3xl text-on-surface">
+                        {{ '%.1f'|format(last_video.asymmetry_pct) if last_video.asymmetry_pct is not none else '—' }}<span class="text-sm font-normal"> %</span>
+                    </p>
+                </div>
+                <a href="{{ url_for('video_page') }}"
+                   class="self-center ripple flex items-center gap-2 bg-primary/15 hover:bg-primary/25 text-primary px-4 py-2.5 rounded-2xl text-sm font-bold transition-colors">
+                    Detail
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <div class="flex items-start gap-4">
+                <div class="w-12 h-12 rounded-2xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-primary">videocam</span>
+                </div>
+                <div>
+                    <p class="font-headline font-bold text-lg">Zatiaľ si neanalyzoval žiadne video</p>
+                    <p class="text-sm text-on-surface-variant mt-1 max-w-lg">
+                        Natoč sa spomalene (Slo-mo, 120 alebo 240 fps) presne z boku, celé telo v zábere.
+                        Appka z videa vyčíta čas kontaktu so zemou pre každý krok zvlášť.
+                    </p>
+                </div>
+            </div>
+            <a href="{{ url_for('video_page') }}"
+               class="btn-glow ripple flex items-center gap-2 bg-primary text-white px-5 py-2.5 rounded-2xl text-sm font-bold">
+                Začať
+            </a>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ── Stat cards ── -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+        <!-- Weekly km -->
+        <div class="card-enter delay-1 glow-card tilt-card bg-surface-container-high rounded-3xl p-5 border border-white/5 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-4 translate-x-4"
+                 style="background: radial-gradient(circle, #ff7852, transparent)"></div>
+            <div class="w-10 h-10 rounded-2xl bg-primary/15 flex items-center justify-center mb-3">
+                <span class="material-symbols-outlined text-primary text-xl">route</span>
+            </div>
+            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">Týždenné km</p>
+            <p class="font-headline font-black text-3xl text-on-surface">
+                {% if weekly_km > 0 %}
+                <span data-count="{{ weekly_km }}" data-decimals="1">{{ weekly_km }}</span>
+                {% else %}—{% endif %}
+                <span class="text-sm font-normal text-on-surface-variant"> km</span>
+            </p>
+        </div>
+
+        <!-- HRV -->
+        <div class="card-enter delay-2 glow-card tilt-card bg-surface-container-high rounded-3xl p-5 border border-white/5 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-4 translate-x-4"
+                 style="background: radial-gradient(circle, #ff7852, transparent)"></div>
+            <div class="w-10 h-10 rounded-2xl bg-primary/15 flex items-center justify-center mb-3">
+                <span class="material-symbols-outlined text-primary text-xl">favorite</span>
+            </div>
+            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">HRV dnes</p>
+            <p class="font-headline font-black text-3xl text-on-surface">
+                {% if last_hrv %}
+                <span data-count="{{ last_hrv }}" data-decimals="0">{{ last_hrv|int }}</span>
+                <span class="text-sm font-normal text-on-surface-variant"> ms</span>
+                {% else %}<span class="text-on-surface-variant text-2xl">—</span>{% endif %}
+            </p>
+            {% if avg_hrv_7 %}
+            <p class="text-xs text-on-surface-variant mt-2">
+                7d priemer:
+                <span class="font-bold {% if last_hrv and last_hrv > avg_hrv_7 %}text-green-400{% elif last_hrv and last_hrv < avg_hrv_7 %}text-red-400{% else %}text-on-surface{% endif %}">
+                    {{ avg_hrv_7 }} ms
+                </span>
+            </p>
+            {% endif %}
+        </div>
+
+        <!-- Recovery -->
+        <div class="card-enter delay-3 glow-card tilt-card bg-surface-container-high rounded-3xl p-5 border border-white/5 relative overflow-hidden">
+            {% if last_recovery is not none %}
+            <div class="absolute top-0 right-0 w-24 h-24 rounded-full -translate-y-4 translate-x-4
+                {% if last_recovery >= 67 %}bg-green-500 opacity-10
+                {% elif last_recovery >= 34 %}bg-yellow-500 opacity-10
+                {% else %}bg-red-500 opacity-10{% endif %}"></div>
+            {% endif %}
+            <div class="w-10 h-10 rounded-2xl flex items-center justify-center mb-3
+                {% if last_recovery is not none and last_recovery >= 67 %}bg-green-500/15
+                {% elif last_recovery is not none and last_recovery >= 34 %}bg-yellow-500/15
+                {% elif last_recovery is not none %}bg-red-500/15
+                {% else %}bg-tertiary/15{% endif %}">
+                <span class="material-symbols-outlined text-xl
+                    {% if last_recovery is not none and last_recovery >= 67 %}text-green-400
+                    {% elif last_recovery is not none and last_recovery >= 34 %}text-yellow-400
+                    {% elif last_recovery is not none %}text-red-400
+                    {% else %}text-tertiary{% endif %}">bolt</span>
+            </div>
+            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">Recovery</p>
+            <p class="font-headline font-black text-3xl">
+                {% if last_recovery is not none %}
+                <span class="{% if last_recovery >= 67 %}text-green-400{% elif last_recovery >= 34 %}text-yellow-400{% else %}text-red-400{% endif %}"
+                      data-count="{{ last_recovery }}" data-decimals="0">{{ last_recovery }}</span>
+                <span class="text-sm font-normal text-on-surface-variant"> %</span>
+                {% else %}<span class="text-on-surface-variant text-2xl">—</span>{% endif %}
+            </p>
+        </div>
+
+        <!-- RHR -->
+        <div class="card-enter delay-4 glow-card tilt-card bg-surface-container-high rounded-3xl p-5 border border-white/5 relative overflow-hidden">
+            <div class="absolute top-0 right-0 w-24 h-24 rounded-full opacity-10 -translate-y-4 translate-x-4"
+                 style="background: radial-gradient(circle, #b8c7ea, transparent)"></div>
+            <div class="w-10 h-10 rounded-2xl bg-secondary/15 flex items-center justify-center mb-3">
+                <span class="material-symbols-outlined text-secondary text-xl">cardiology</span>
+            </div>
+            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider mb-1">Pokojový tep</p>
+            <p class="font-headline font-black text-3xl text-on-surface">
+                {% if last_rhr %}
+                <span data-count="{{ last_rhr }}" data-decimals="0">{{ last_rhr }}</span>
+                <span class="text-sm font-normal text-on-surface-variant"> bpm</span>
+                {% else %}<span class="text-on-surface-variant text-2xl">—</span>{% endif %}
+            </p>
+        </div>
+    </div>
+
+    <!-- ── Quick links + Recent logs ── -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+        <!-- Quick links -->
+        <div class="reveal bg-surface-container-low rounded-3xl p-6 border border-white/5">
+            <h3 class="font-headline font-bold text-on-surface mb-4 flex items-center gap-2">
+                <span class="material-symbols-outlined text-primary text-base">apps</span>
+                Rýchly prístup
+            </h3>
+            <div class="space-y-1">
+                {% set links = [
+                    ('log_data',   'add_circle',     'primary',   'Zaloguj WHOOP dáta',    'HRV, recovery, pokojový tep'),
+                    ('trainings',  'directions_run', 'tertiary',  'Zaloguj tréning',        'Interval, tempo, šprint'),
+                    ('ai_portal',  'smart_toy',      'primary',   'AI Tréner',              'Readiness + AI Coach chat'),
+                    ('biometrics', 'monitoring',     'secondary', 'HRV & RHR Grafy',        'Trendy, porovnanie období'),
+                    ('osobaky',    'emoji_events',   'tertiary',  'Osobné rekordy',         '400m, 800m, 5k, 10k…'),
+                ] %}
+                {% for endpoint, icon, color, title, sub in links %}
+                <a href="{{ url_for(endpoint) }}"
+                   class="ripple flex items-center gap-3 p-3 rounded-2xl hover:bg-surface-container transition-all group">
+                    <div class="w-9 h-9 rounded-xl bg-{{ color }}/15 flex items-center justify-center flex-shrink-0
+                                group-hover:scale-110 transition-transform">
+                        <span class="material-symbols-outlined text-{{ color }} text-base">{{ icon }}</span>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-bold text-on-surface">{{ title }}</p>
+                        <p class="text-xs text-on-surface-variant truncate">{{ sub }}</p>
+                    </div>
+                    <span class="material-symbols-outlined text-on-surface-variant text-sm opacity-0 group-hover:opacity-60 group-hover:translate-x-1 transition-all">arrow_forward</span>
+                </a>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Recent logs -->
+        <div class="reveal reveal-d2 bg-surface-container-low rounded-3xl p-6 border border-white/5">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-headline font-bold text-on-surface flex items-center gap-2">
+                    <span class="material-symbols-outlined text-primary text-base">history</span>
+                    Posledné záznamy
+                </h3>
+                <a href="{{ url_for('log_data') }}" class="text-xs font-bold text-primary hover:underline">Všetky →</a>
+            </div>
+
+            {% if recent_logs %}
+            <div class="space-y-2">
+                {% for log in recent_logs %}
+                <div class="flex items-center justify-between bg-surface-container rounded-2xl px-4 py-3
+                            hover:bg-surface-container-high transition-colors group">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-xl bg-surface-container-high flex items-center justify-center flex-shrink-0">
+                            <span class="material-symbols-outlined text-on-surface-variant text-sm">calendar_today</span>
+                        </div>
+                        <p class="text-xs font-bold text-on-surface-variant">{{ log.date.strftime('%d. %m.') }}</p>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <p class="text-[10px] text-on-surface-variant uppercase tracking-wider font-bold">HRV</p>
+                            <p class="font-headline font-bold text-on-surface text-sm">{{ log.hrv|int }} <span class="text-xs text-on-surface-variant font-normal">ms</span></p>
+                        </div>
+                        <div class="w-px h-6 bg-white/5"></div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-on-surface-variant uppercase tracking-wider font-bold">Recovery</p>
+                            {% if log.recovery is not none %}
+                            <p class="font-headline font-bold text-sm
+                                {% if log.recovery >= 67 %}text-green-400
+                                {% elif log.recovery >= 34 %}text-yellow-400
+                                {% else %}text-red-400{% endif %}">
+                                {{ log.recovery }}<span class="text-xs text-on-surface-variant font-normal"> %</span>
+                            </p>
+                            {% else %}
+                            <p class="font-headline font-bold text-sm text-on-surface-variant">—</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="flex flex-col items-center justify-center py-12 text-center">
+                <div class="w-14 h-14 rounded-2xl bg-surface-container flex items-center justify-center mb-3">
+                    <span class="material-symbols-outlined text-on-surface-variant text-3xl opacity-40">sentiment_neutral</span>
+                </div>
+                <p class="text-on-surface-variant font-bold text-sm">Zatiaľ žiadne záznamy</p>
+                <a href="{{ url_for('log_data') }}" class="text-xs text-primary font-bold mt-2 hover:underline">Pridaj prvý záznam →</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}

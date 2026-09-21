@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="mt-6 pb-12">
+    <!-- Page Header -->
+    <div class="mb-8">
+        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">Biometrické dáta</p>
+        <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">LOGOVANIE WHOOP</h2>
+    </div>
+
+    <!-- WHOOP CSV Import -->
+    <div class="mb-6 bg-surface-container-low rounded-3xl p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+        <div class="w-10 h-10 rounded-2xl bg-tertiary-container flex items-center justify-center shrink-0">
+            <span class="material-symbols-outlined text-tertiary text-xl">upload_file</span>
+        </div>
+        <div class="flex-1">
+            <h3 class="font-headline font-bold text-on-surface">Import z WHOOP</h3>
+            <p class="text-xs text-on-surface-variant mt-0.5">Nahraj CSV export z WHOOP aplikácie — automaticky importuje HRV, Recovery a RHR.</p>
+        </div>
+        <form method="POST" action="/import-whoop" enctype="multipart/form-data" class="flex items-center gap-3">
+            <label class="cursor-pointer flex items-center gap-2 bg-surface-container border border-white/10 hover:border-primary/40 transition-colors rounded-2xl px-4 py-2.5 text-sm font-semibold text-on-surface-variant">
+                <span class="material-symbols-outlined text-base">folder_open</span>
+                <span id="file-label">Vybrať CSV</span>
+                <input type="file" name="whoop_csv" accept=".csv" multiple class="hidden" onchange="document.getElementById('file-label').textContent = this.files.length > 1 ? this.files.length + ' súborov' : (this.files[0]?.name || 'Vybrať CSV')">
+            </label>
+            <button type="submit" class="bg-tertiary hover:opacity-90 transition-opacity text-white font-headline font-bold py-2.5 px-5 rounded-2xl text-sm flex items-center gap-1.5">
+                <span class="material-symbols-outlined text-base">upload</span>
+                Importovať
+            </button>
+        </form>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+        <!-- Form Card -->
+        <div class="md:col-span-5 bg-surface-container-low rounded-3xl p-6 lg:p-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-2xl bg-primary-container flex items-center justify-center">
+                    <span class="material-symbols-outlined text-primary text-xl">add_circle</span>
+                </div>
+                <div>
+                    <h3 class="font-headline font-bold text-on-surface">Zadať nové meranie</h3>
+                    <p class="text-xs text-on-surface-variant">Ranné biometrické hodnoty</p>
+                </div>
+            </div>
+
+            <form method="POST" class="space-y-5">
+                <div>
+                    <label for="hrv">HRV <span class="text-on-surface/30 normal-case font-normal">(Heart Rate Variability v ms)</span></label>
+                    <input type="number" id="hrv" name="hrv" placeholder="napr. 65" step="0.1" required>
+                </div>
+                <div>
+                    <label for="recovery">Recovery (%)</label>
+                    <input type="number" id="recovery" name="recovery" placeholder="napr. 85" min="0" max="100">
+                </div>
+                <div>
+                    <label for="rhr">RHR <span class="text-on-surface/30 normal-case font-normal">(Pokojový tep, voliteľné)</span></label>
+                    <input type="number" id="rhr" name="rhr" placeholder="napr. 48">
+                </div>
+                <button type="submit" class="w-full mt-2 bg-primary hover:opacity-90 transition-opacity text-white font-headline font-bold py-3 px-6 rounded-2xl text-sm uppercase tracking-wider flex items-center justify-center gap-2">
+                    <span class="material-symbols-outlined text-base">save</span>
+                    Uložiť do databázy
+                </button>
+            </form>
+        </div>
+
+        <!-- Recent Logs -->
+        <div class="md:col-span-7 bg-surface-container-high rounded-3xl p-6 lg:p-8">
+            <div class="flex items-center justify-between mb-6">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-secondary-container flex items-center justify-center">
+                        <span class="material-symbols-outlined text-secondary text-xl">history</span>
+                    </div>
+                    <div>
+                        <h3 class="font-headline font-bold text-on-surface">Posledné záznamy</h3>
+                        <p class="text-xs text-on-surface-variant">História biometrických meraní</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="space-y-3 max-h-[420px] overflow-y-auto pr-1">
+                {% for log in logs %}
+                <div class="flex items-center justify-between bg-surface-container-low p-4 rounded-2xl hover:bg-surface-bright transition-colors group">
+                    <div class="flex items-center gap-3">
+                        <div class="w-9 h-9 rounded-xl bg-surface-container flex items-center justify-center">
+                            <span class="material-symbols-outlined text-on-surface-variant text-base">calendar_today</span>
+                        </div>
+                        <div>
+                            <p class="text-xs text-on-surface-variant font-bold">{{ log.date.strftime('%d. %m. %Y') }}</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <div class="text-right">
+                            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">HRV</p>
+                            <p class="font-headline font-bold text-on-surface">{{ log.hrv }} <span class="text-xs text-on-surface-variant font-normal">ms</span></p>
+                        </div>
+                        {% if log.recovery %}
+                        <div class="w-px h-8 bg-white/5"></div>
+                        <div class="text-right">
+                            <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Recovery</p>
+                            <p class="font-headline font-bold text-tertiary">{{ log.recovery }} <span class="text-xs text-on-surface-variant font-normal">%</span></p>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% else %}
+                <div class="flex flex-col items-center justify-center py-16 text-center">
+                    <span class="material-symbols-outlined text-on-surface-variant text-5xl mb-4 opacity-30">sentiment_neutral</span>
+                    <p class="text-on-surface-variant font-bold">Zatiaľ žiadne záznamy</p>
+                    <p class="text-xs text-on-surface-variant opacity-60 mt-1">Pridaj prvý záznam vľavo</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</main>
+{% endblock %}

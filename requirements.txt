@@ -1,0 +1,18 @@
+Flask==3.1.3
+Flask-SQLAlchemy==3.1.1
+stravalib==2.4
+python-dotenv==1.2.2
+requests==2.33.1
+
+# --- Analýza videa (kontakt so zemou) ---
+# Táto trojica je odskúšaná a navzájom kompatibilná.
+# POZOR na dve veci:
+#   1) mediapipe má wheely len pre Python 3.9 – 3.12 (na 3.13+ sa nenainštaluje)
+#   2) mediapipe 0.10.21 potrebuje numpy < 2, preto je pripnuté aj opencv 4.10
+# Novšie mediapipe (0.10.22+) tiež funguje, ale zrušilo staré API a pri prvom
+# spustení si musí stiahnuť model kostry z internetu (~9 MB) – appka to urobí
+# sama a uloží ho do priečinka models/.
+# Zvyšok aplikácie (Strava, biometrika, AI chat) funguje aj bez týchto balíkov.
+mediapipe==0.10.21
+opencv-python==4.10.0.84
+numpy==1.26.4

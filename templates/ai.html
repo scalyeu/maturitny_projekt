@@ -1,0 +1,478 @@
+{% extends "base.html" %}
+
+{% block content %}
+<main class="mt-6 pb-12 space-y-8">
+
+    <!-- Header -->
+    <div>
+        <p class="text-on-surface-variant font-headline font-semibold text-sm uppercase tracking-widest mb-1">AI Portál</p>
+        <h2 class="text-4xl font-headline font-extrabold tracking-tight text-on-surface">TVOJ TRÉNERSKÝ AI</h2>
+    </div>
+
+    <!-- ─── Readiness ──────────────────────────────────────────────────── -->
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 reveal">
+
+        <!-- Hlavná karta -->
+        <div class="md:col-span-7 bg-surface-container-high rounded-3xl p-6 lg:p-8 relative overflow-hidden">
+            <div id="readiness-glow" class="absolute -top-16 -right-16 w-64 h-64 rounded-full blur-3xl opacity-20 pointer-events-none bg-green-400 transition-all duration-700"></div>
+
+            <div class="relative">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 rounded-2xl bg-surface-container-highest flex items-center justify-center">
+                        <span class="material-symbols-outlined text-xl float-icon" id="readiness-icon" style="color:#4ade80">rocket_launch</span>
+                    </div>
+                    <div>
+                        <h3 class="font-headline font-bold text-on-surface">Pripravenosť na tréning</h3>
+                        <p class="text-xs text-on-surface-variant" id="readiness-date">Načítavam...</p>
+                    </div>
+                </div>
+
+                <!-- Kruh + percento -->
+                <div class="flex items-center gap-8 py-4">
+                    <div class="relative w-36 h-36 flex-shrink-0">
+                        <svg class="w-full h-full -rotate-90" viewBox="0 0 100 100">
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="#1e2d47" stroke-width="10"/>
+                            <circle id="readiness-ring" cx="50" cy="50" r="42" fill="none"
+                                stroke="#4ade80" stroke-width="10"
+                                stroke-linecap="round"
+                                stroke-dasharray="264"
+                                stroke-dashoffset="264"
+                                class="transition-all duration-1000"/>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span id="readiness-pct" class="font-headline font-black text-4xl text-on-surface">--</span>
+                            <span class="text-xs text-on-surface-variant font-bold">%</span>
+                        </div>
+                    </div>
+
+                    <div class="flex-1 min-w-0">
+                        <p id="readiness-label" class="font-headline font-extrabold text-2xl text-on-surface mb-2">--</p>
+                        <p id="readiness-sublabel" class="text-sm text-on-surface-variant leading-relaxed">--</p>
+                        <div id="readiness-no-data" class="hidden mt-3">
+                            <a href="/log" class="inline-flex items-center gap-1.5 text-xs text-primary font-bold hover:underline">
+                                <span class="material-symbols-outlined text-sm">add_circle</span>
+                                Zaloguj dnešné HRV a recovery
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Štatistiky -->
+                <div id="readiness-stats" class="grid grid-cols-3 gap-3 mt-4 pt-4 border-t border-white/5">
+                    <div class="text-center">
+                        <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">HRV dnes</p>
+                        <p id="stat-hrv" class="font-bold text-on-surface text-lg mt-1">--</p>
+                        <p id="stat-hrv-diff" class="text-[10px] text-on-surface-variant">vs. priemer</p>
+                    </div>
+                    <div class="text-center border-x border-white/5">
+                        <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Recovery</p>
+                        <p id="stat-recovery" class="font-bold text-on-surface text-lg mt-1">--</p>
+                        <p class="text-[10px] text-on-surface-variant">zo 100</p>
+                    </div>
+                    <div class="text-center">
+                        <p class="text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">Pokojový tep</p>
+                        <p id="stat-rhr" class="font-bold text-on-surface text-lg mt-1">--</p>
+                        <p class="text-[10px] text-on-surface-variant">bpm</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bočný panel -->
+        <div class="md:col-span-5 flex flex-col gap-4">
+
+            <!-- HRV trend -->
+            <div class="bg-surface-container-low rounded-3xl p-5 flex-1">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-primary text-base">monitoring</span>
+                    <h4 class="font-headline font-bold text-on-surface text-sm">HRV trend (30 dní)</h4>
+                </div>
+                <div id="hrv-avg-info" class="space-y-3">
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-on-surface-variant">30-dňový priemer</span>
+                        <span id="stat-hrv-avg" class="font-bold text-on-surface text-sm">-- ms</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-on-surface-variant">Dnešné HRV</span>
+                        <span id="stat-hrv-today" class="font-bold text-sm">-- ms</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-xs text-on-surface-variant">Dni s dátami</span>
+                        <span id="stat-days" class="font-bold text-on-surface text-sm">--</span>
+                    </div>
+                    <div class="w-full bg-surface-container rounded-full h-2 mt-2">
+                        <div id="hrv-bar" class="h-2 rounded-full bg-primary transition-all duration-700" style="width:0%"></div>
+                    </div>
+                    <p class="text-[10px] text-on-surface-variant">HRV dnes vs. priemer</p>
+                </div>
+            </div>
+
+            <!-- Tip dňa -->
+            <div class="bg-surface-container-low rounded-3xl p-5">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="material-symbols-outlined text-tertiary text-base">lightbulb</span>
+                    <h4 class="font-headline font-bold text-on-surface text-sm">Odporúčanie dňa</h4>
+                </div>
+                <p id="daily-tip" class="text-sm text-on-surface-variant leading-relaxed">Načítavam...</p>
+            </div>
+
+            <!-- Refresh -->
+            <button onclick="loadReadiness()"
+                class="w-full flex items-center justify-center gap-2 bg-surface-container border border-white/10 hover:border-primary/40 text-on-surface-variant hover:text-on-surface text-sm font-bold py-3 rounded-2xl transition-all">
+                <span class="material-symbols-outlined text-base">refresh</span>
+                Aktualizovať
+            </button>
+        </div>
+    </div>
+
+    <!-- ─── Profil banner ───────────────────────────────────────────────── -->
+    <div id="profile-banner" class="hidden bg-surface-container-high border border-primary/20 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-primary text-xl">person</span>
+            <div>
+                <p class="font-bold text-on-surface text-sm" id="profile-name-display">Tvoj profil</p>
+                <p class="text-xs text-on-surface-variant" id="profile-detail-display"></p>
+            </div>
+        </div>
+        <a href="/profile" class="text-xs text-primary font-bold hover:underline flex-shrink-0">Upraviť</a>
+    </div>
+    <div id="no-profile-banner" class="bg-surface-container border border-white/10 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+        <div class="flex items-center gap-3">
+            <span class="material-symbols-outlined text-on-surface-variant text-xl">person_add</span>
+            <p class="text-sm text-on-surface-variant">Nastav si profil atleta — AI bude vedieť tvoje meno, vek a cieľ.</p>
+        </div>
+        <a href="/profile" class="text-xs bg-primary text-white font-bold px-3 py-1.5 rounded-xl hover:opacity-90 transition flex-shrink-0">Nastaviť</a>
+    </div>
+
+    <!-- ─── AI Coach Chat ──────────────────────────────────────────────── -->
+    <div class="reveal reveal-d2 bg-surface-container-low rounded-3xl overflow-hidden flex flex-col" style="height:620px">
+
+        <div class="flex items-center gap-3 px-6 py-4 border-b border-white/5 flex-shrink-0">
+            <div class="w-10 h-10 rounded-2xl bg-primary/15 flex items-center justify-center">
+                <span class="material-symbols-outlined text-primary text-xl">smart_toy</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <h3 class="font-headline font-bold text-on-surface">Running AI Coach</h3>
+                <p class="text-xs text-on-surface-variant truncate">Pozná tvoje dáta: rekordy, HRV, tréningy (60 dní) • DeepSeek R1 via Groq</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <div class="flex items-center gap-1.5">
+                    <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                    <span class="text-xs text-on-surface-variant">Online</span>
+                </div>
+                <button onclick="clearChat()" title="Vymazať konverzáciu"
+                    class="w-8 h-8 rounded-xl hover:bg-surface-container-high flex items-center justify-center transition-colors">
+                    <span class="material-symbols-outlined text-on-surface-variant text-base">delete_sweep</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="chat-messages" class="flex-1 overflow-y-auto px-6 py-5 space-y-5">
+            <div class="flex items-start gap-3">
+                <div class="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <span class="material-symbols-outlined text-primary text-sm">smart_toy</span>
+                </div>
+                <div class="max-w-xl">
+                    <div class="bg-surface-container-high rounded-2xl rounded-tl-sm px-4 py-3">
+                        <p class="text-sm text-on-surface leading-relaxed">
+                            Ahoj! Som tvoj AI tréner pre bežcov a šprintérov. Môžem ti pomôcť s
+                            <strong>tréningovými plánmi</strong>, interpretáciou <strong>HRV</strong>,
+                            regeneráciou, technikou a výživou. Na čo sa chceš opýtať?
+                        </p>
+                    </div>
+                    <p class="text-[10px] text-on-surface-variant mt-1 ml-1">Práve teraz</p>
+                </div>
+            </div>
+
+            <div class="flex flex-wrap gap-2 ml-11">
+                <button onclick="sendSuggestion('Ako zlepšiť čas na 400m šprint?')"
+                    class="suggestion-btn text-xs bg-surface-container border border-white/10 text-on-surface-variant hover:text-on-surface hover:border-primary/50 px-3 py-1.5 rounded-full transition-all">
+                    Ako zlepšiť 400m?
+                </button>
+                <button onclick="sendSuggestion('Mám nízke HRV, čo to znamená a čo mám robiť?')"
+                    class="suggestion-btn text-xs bg-surface-container border border-white/10 text-on-surface-variant hover:text-on-surface hover:border-primary/50 px-3 py-1.5 rounded-full transition-all">
+                    Nízke HRV — čo robiť?
+                </button>
+                <button onclick="sendSuggestion('Zostav mi 4-týždňový tréningový plán pre 400m šprint, 3x týždenne')"
+                    class="suggestion-btn text-xs bg-surface-container border border-white/10 text-on-surface-variant hover:text-on-surface hover:border-primary/50 px-3 py-1.5 rounded-full transition-all">
+                    Tréningový plán
+                </button>
+                <button onclick="sendSuggestion('Čo jesť deň pred pretekmi na 400m?')"
+                    class="suggestion-btn text-xs bg-surface-container border border-white/10 text-on-surface-variant hover:text-on-surface hover:border-primary/50 px-3 py-1.5 rounded-full transition-all">
+                    Výživa pred pretekmi
+                </button>
+            </div>
+        </div>
+
+        <div class="px-6 py-4 border-t border-white/5 flex-shrink-0">
+            <div class="flex gap-3 items-end">
+                <textarea id="chat-input" rows="1"
+                    placeholder="Napíš otázku o behu, šprinte, HRV, regenerácii..."
+                    class="flex-1 resize-none text-sm leading-relaxed"
+                    style="min-height:42px; max-height:120px;"
+                    onkeydown="handleKey(event)"
+                    oninput="autoResize(this)"></textarea>
+                <button onclick="sendMessage()" id="send-btn"
+                    class="w-11 h-11 rounded-2xl bg-primary hover:opacity-90 active:scale-95 transition-all flex items-center justify-center flex-shrink-0">
+                    <span class="material-symbols-outlined text-white text-xl" id="send-icon">send</span>
+                </button>
+            </div>
+            <p class="text-[10px] text-on-surface-variant mt-2 text-center opacity-60">
+                Enter = odošli &nbsp;·&nbsp; Shift+Enter = nový riadok
+            </p>
+        </div>
+    </div>
+
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Farby podľa readiness ───────────────────────────────────────────────
+const COLORS = {
+    green:  { hex: '#4ade80', glow: 'bg-green-400',  ring: '#4ade80' },
+    yellow: { hex: '#facc15', glow: 'bg-yellow-400', ring: '#facc15' },
+    orange: { hex: '#fb923c', glow: 'bg-orange-400', ring: '#fb923c' },
+    red:    { hex: '#f87171', glow: 'bg-red-400',    ring: '#f87171' },
+};
+
+const TIPS = {
+    green:  'HRV je nad tvojím priemerom — telo je zregenerované. Ideálny deň na intervalový tréning alebo rýchlostné úseky na 400m.',
+    yellow: 'Forma je dobrá, ale nie na maxime. Skús tempový beh (80–85% max tempa) alebo technické drily.',
+    orange: 'Telo stále regeneruje. Odporúčam 20–30 min ľahký klus + strečing. Intenzita počká na zajtra.',
+    red:    'HRV a recovery sú pod normálom. Aktívny odpočinok (prechádzka, plávanie) alebo úplný oddych. Tvrdo trénovať by zhoršilo regeneráciu.',
+};
+
+// ── Readiness loader ────────────────────────────────────────────────────
+async function loadReadiness() {
+    try {
+        const res  = await fetch('/api/readiness');
+        const data = await res.json();
+
+        if (data.error) {
+            document.getElementById('readiness-label').textContent = 'Žiadne dáta';
+            document.getElementById('readiness-sublabel').textContent = data.error;
+            document.getElementById('readiness-no-data').classList.remove('hidden');
+            document.getElementById('readiness-pct').textContent = '--';
+            document.getElementById('daily-tip').textContent = 'Zaloguj HRV a recovery v sekcii Logovanie a readiness sa vypočíta automaticky.';
+            return;
+        }
+
+        const c = COLORS[data.color] || COLORS.green;
+
+        // Percento + kruh
+        document.getElementById('readiness-pct').textContent = data.readiness;
+        const offset = 264 - (264 * data.readiness / 100);
+        const ring = document.getElementById('readiness-ring');
+        ring.style.strokeDashoffset = offset;
+        ring.style.stroke = c.ring;
+
+        // Glow + ikona
+        const glow = document.getElementById('readiness-glow');
+        glow.className = glow.className.replace(/bg-\w+-400/, c.glow.replace('bg-', 'bg-'));
+        document.getElementById('readiness-icon').style.color = c.hex;
+        document.getElementById('readiness-icon').textContent = data.icon;
+
+        // Text
+        document.getElementById('readiness-label').textContent   = data.label;
+        document.getElementById('readiness-sublabel').textContent = data.sublabel;
+        document.getElementById('readiness-date').textContent     = `Dáta z ${data.log_date}`;
+
+        // Štatistiky
+        document.getElementById('stat-hrv').textContent      = data.hrv + ' ms';
+        document.getElementById('stat-hrv-diff').textContent  = data.hrv_diff + ' ms vs. priemer';
+        document.getElementById('stat-recovery').textContent  = (data.recovery != null) ? (data.recovery + ' %') : '—';
+        document.getElementById('stat-rhr').textContent       = data.rhr ? data.rhr : '—';
+
+        // Bočný panel
+        document.getElementById('stat-hrv-avg').textContent   = data.hrv_avg_30 + ' ms';
+        document.getElementById('stat-hrv-today').textContent = data.hrv + ' ms';
+        document.getElementById('stat-hrv-today').style.color = c.hex;
+        document.getElementById('stat-days').textContent      = data.days_of_data + ' dní';
+
+        const barPct = Math.min(100, Math.max(5, (data.hrv / data.hrv_avg_30) * 50));
+        document.getElementById('hrv-bar').style.width = barPct + '%';
+
+        // Tip
+        document.getElementById('daily-tip').textContent = TIPS[data.color];
+
+    } catch(e) {
+        document.getElementById('readiness-label').textContent    = 'Chyba načítania';
+        document.getElementById('readiness-sublabel').textContent = 'Skontroluj či beží Flask server.';
+    }
+}
+
+// Načítaj pri otvorení stránky
+loadReadiness();
+
+// ── Profil banner ───────────────────────────────────────────────────────
+async function loadProfile() {
+    try {
+        const res = await fetch('/profile/api');
+        if (!res.ok) return;
+        const p = await res.json();
+        if (p && (p.name || p.sport || p.goal)) {
+            document.getElementById('no-profile-banner').classList.add('hidden');
+            document.getElementById('profile-banner').classList.remove('hidden');
+            document.getElementById('profile-name-display').textContent = p.name || 'Tvoj profil';
+            const parts = [];
+            if (p.age) parts.push(p.age + ' r.');
+            if (p.sport) parts.push(p.sport);
+            if (p.goal) parts.push('Cieľ: ' + p.goal);
+            document.getElementById('profile-detail-display').textContent = parts.join(' • ');
+        }
+    } catch(e) {}
+}
+loadProfile();
+
+// ── Chatbot ─────────────────────────────────────────────────────────────
+function timeNow() {
+    return new Date().toLocaleTimeString('sk-SK', { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatMarkdown(text) {
+    return text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\*(.*?)\*/g, '<em>$1</em>')
+        .replace(/^#{1,3} (.+)$/gm, '<p class="font-bold text-on-surface mt-2 mb-0.5">$1</p>')
+        .replace(/^\d+\.\s(.+)$/gm, '<div class="flex gap-2 mt-1"><span class="text-primary font-bold flex-shrink-0">•</span><span>$1</span></div>')
+        .replace(/^[-*]\s(.+)$/gm,  '<div class="flex gap-2 mt-1"><span class="text-primary font-bold flex-shrink-0">•</span><span>$1</span></div>')
+        .replace(/\n\n/g, '<div class="mt-2"></div>')
+        .replace(/\n/g, '<br>');
+}
+
+function autoResize(el) {
+    el.style.height = 'auto';
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
+function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+}
+
+function sendSuggestion(text) {
+    document.querySelectorAll('.suggestion-btn').forEach(b => b.closest('.flex.flex-wrap')?.remove());
+    document.getElementById('chat-input').value = text;
+    sendMessage();
+}
+
+function appendMessage(role, text) {
+    const container = document.getElementById('chat-messages');
+    const isUser = role === 'user';
+    const wrapper = document.createElement('div');
+    wrapper.className = `flex items-start gap-3 ${isUser ? 'flex-row-reverse' : ''}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = `w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5 ${isUser ? 'bg-primary/20' : 'bg-primary/15'}`;
+    avatar.innerHTML = `<span class="material-symbols-outlined text-primary text-sm">${isUser ? 'person' : 'smart_toy'}</span>`;
+
+    const msgWrap = document.createElement('div');
+    msgWrap.className = 'max-w-xl flex flex-col ' + (isUser ? 'items-end' : 'items-start');
+
+    const bubble = document.createElement('div');
+    bubble.className = `rounded-2xl px-4 py-3 text-sm text-on-surface leading-relaxed ${isUser ? 'bg-primary/15 rounded-tr-sm' : 'bg-surface-container-high rounded-tl-sm'}`;
+    bubble.innerHTML = formatMarkdown(text);
+
+    const ts = document.createElement('p');
+    ts.className = `text-[10px] text-on-surface-variant mt-1 ${isUser ? 'mr-1 text-right' : 'ml-1'}`;
+    ts.textContent = timeNow();
+
+    msgWrap.appendChild(bubble);
+    msgWrap.appendChild(ts);
+    wrapper.appendChild(avatar);
+    wrapper.appendChild(msgWrap);
+    container.appendChild(wrapper);
+    container.scrollTop = container.scrollHeight;
+}
+
+function appendTyping() {
+    const container = document.getElementById('chat-messages');
+    const el = document.createElement('div');
+    el.id = 'typing-indicator';
+    el.className = 'flex items-start gap-3';
+    el.innerHTML = `
+        <div class="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0">
+            <span class="material-symbols-outlined text-primary text-sm">smart_toy</span>
+        </div>
+        <div class="bg-surface-container-high rounded-2xl rounded-tl-sm px-4 py-3">
+            <div class="flex gap-1 items-center h-5">
+                <span class="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce" style="animation-delay:0ms"></span>
+                <span class="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce" style="animation-delay:150ms"></span>
+                <span class="w-2 h-2 bg-on-surface-variant rounded-full animate-bounce" style="animation-delay:300ms"></span>
+            </div>
+        </div>`;
+    container.appendChild(el);
+    container.scrollTop = container.scrollHeight;
+}
+
+// Načítaj históriu z DB pri otvorení stránky
+async function loadChatHistory() {
+    try {
+        const res = await fetch('/api/chat/history');
+        const msgs = await res.json();
+        if (!msgs.length) return;
+        // Skry suggestion buttons ak je história
+        document.querySelectorAll('.suggestion-btn').forEach(b => b.closest('.flex.flex-wrap')?.remove());
+        msgs.forEach(m => appendMessage(m.role, m.content));
+    } catch(e) {}
+}
+loadChatHistory();
+
+async function sendMessage() {
+    const input    = document.getElementById('chat-input');
+    const sendBtn  = document.getElementById('send-btn');
+    const sendIcon = document.getElementById('send-icon');
+    const message  = input.value.trim();
+    if (!message || sendBtn.disabled) return;
+
+    input.value = '';
+    input.style.height = 'auto';
+    sendBtn.disabled = true;
+    sendIcon.textContent = 'hourglass_empty';
+
+    appendMessage('user', message);
+    appendTyping();
+
+    try {
+        const res  = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+        const data = await res.json();
+        document.getElementById('typing-indicator')?.remove();
+
+        if (data.reply) {
+            appendMessage('assistant', data.reply);
+        } else {
+            appendMessage('assistant', `Chyba: ${data.error || 'Neznáma chyba'}`);
+        }
+    } catch(e) {
+        document.getElementById('typing-indicator')?.remove();
+        appendMessage('assistant', 'Nepodarilo sa spojiť so serverom.');
+    } finally {
+        sendBtn.disabled = false;
+        sendIcon.textContent = 'send';
+        input.focus();
+    }
+}
+
+async function clearChat() {
+    await fetch('/api/chat/clear', { method: 'POST' });
+    const container = document.getElementById('chat-messages');
+    container.innerHTML = `
+        <div class="flex items-start gap-3">
+            <div class="w-8 h-8 rounded-xl bg-primary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+                <span class="material-symbols-outlined text-primary text-sm">smart_toy</span>
+            </div>
+            <div class="max-w-xl">
+                <div class="bg-surface-container-high rounded-2xl rounded-tl-sm px-4 py-3">
+                    <p class="text-sm text-on-surface">Konverzácia vymazaná. Na čo sa chceš opýtať?</p>
+                </div>
+                <p class="text-[10px] text-on-surface-variant mt-1 ml-1">${timeNow()}</p>
+            </div>
+        </div>`;
+}
+</script>
+{% endblock %}

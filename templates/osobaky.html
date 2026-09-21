@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block head %}
+<style>
+    .pr-card {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, #0f1826 0%, #162033 100%);
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 1.5rem;
+        transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+    }
+    .pr-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 16px 48px rgba(255,120,82,0.12);
+        border-color: rgba(255,120,82,0.25);
+    }
+    .pr-card .ghost-num {
+        position: absolute;
+        right: 1.2rem;
+        top: 0.8rem;
+        font-family: 'Lexend', sans-serif;
+        font-weight: 900;
+        font-size: 4.5rem;
+        line-height: 1;
+        color: rgba(255,255,255,0.04);
+        pointer-events: none;
+        user-select: none;
+        letter-spacing: -0.04em;
+    }
+    .time-display {
+        font-family: 'Lexend', sans-serif;
+        font-weight: 800;
+        font-size: 2.2rem;
+        letter-spacing: -0.03em;
+        color: #ff7852;
+        line-height: 1;
+    }
+    .dist-label {
+        font-family: 'Lexend', sans-serif;
+        font-weight: 900;
+        letter-spacing: -0.04em;
+        line-height: 1;
+    }
+    .meta-label {
+        font-size: 0.68rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.1em;
+        color: #8896b3;
+    }
+    .stat-block {
+        background: rgba(255,255,255,0.03);
+        border: 1px solid rgba(255,255,255,0.05);
+        border-radius: 0.75rem;
+        padding: 0.55rem 0.8rem;
+    }
+    .badge-pr {
+        background: linear-gradient(90deg, #ff7852, #ffa766);
+        color: white;
+        font-size: 0.58rem;
+        font-weight: 800;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        padding: 2px 8px;
+        border-radius: 999px;
+        animation: pulse-pr 2.5s infinite;
+    }
+    @keyframes pulse-pr { 0%,100%{opacity:1} 50%{opacity:0.65} }
+    .strava-pill {
+        display: inline-flex; align-items: center; gap: 5px;
+        background: rgba(252,76,2,0.10);
+        border: 1px solid rgba(252,76,2,0.28);
+        border-radius: 999px; padding: 3px 10px;
+        font-size: 0.68rem; font-weight: 700;
+        color: #fc4c02; letter-spacing: 0.05em; text-transform: uppercase;
+    }
+    .no-pr {
+        border: 1.5px dashed rgba(255,255,255,0.07);
+        border-radius: 1.5rem;
+    }
+    .fade-in { animation: fadeUp 0.45s ease both; }
+    @keyframes fadeUp {
+        from { opacity:0; transform:translateY(14px); }
+        to   { opacity:1; transform:translateY(0); }
+    }
+    .c1{animation-delay:.04s} .c2{animation-delay:.1s}  .c3{animation-delay:.16s}
+    .c4{animation-delay:.22s} .c5{animation-delay:.28s} .c6{animation-delay:.34s}
+</style>
+{% endblock %}
+
+{# ─── reusable card macro ──────────────────────────────────────────── #}
+{% macro pr_card(key, dist_text, unit, ghost, emoji, motivate, delay_cls) %}
+{% set r = prs[key] if prs and prs.get(key) else none %}
+<div class="pr-card fade-in {{ delay_cls }} p-6">
+
+    {# ghost number #}
+    <span class="ghost-num">{{ ghost }}</span>
+
+    {# header row #}
+    <div class="flex items-start justify-between mb-5">
+        <div>
+            <p class="meta-label mb-1">Osobný rekord</p>
+            <p class="dist-label text-4xl text-white">{{ dist_text }}
+                <span class="text-2xl font-semibold" style="color:#8896b3">{{ unit }}</span>
+            </p>
+        </div>
+        {% if r %}<span class="badge-pr">PR</span>{% endif %}
+    </div>
+
+    {% if r %}
+        {# time #}
+        <div class="time-display mb-0.5">{{ r.time }}</div>
+        <p class="meta-label mb-5">{{ r.pace }} /km &nbsp;·&nbsp; {{ r.date }}</p>
+
+        {# stats row #}
+        <div class="grid grid-cols-3 gap-2 mb-5">
+            <div class="stat-block">
+                <p class="meta-label">Srdce</p>
+                <p class="text-sm font-bold text-on-surface mt-0.5">
+                    {{ r.avg_hr or '—' }}<span class="text-xs text-on-surface-variant font-normal"> bpm</span>
+                </p>
+            </div>
+            <div class="stat-block">
+                <p class="meta-label">Elev.</p>
+                <p class="text-sm font-bold text-on-surface mt-0.5">
+                    {{ r.elevation or '—' }}<span class="text-xs text-on-surface-variant font-normal"> m</span>
+                </p>
+            </div>
+            <div class="stat-block">
+                <p class="meta-label">Kadencia</p>
+                <p class="text-sm font-bold text-on-surface mt-0.5">
+                    {{ r.cadence or '—' }}<span class="text-xs text-on-surface-variant font-normal"> spm</span>
+                </p>
+            </div>
+        </div>
+
+        {# strava link #}
+        <a href="{{ r.strava_url }}" target="_blank"
+           class="flex items-center gap-2 text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" style="color:#fc4c02">
+                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+            </svg>
+            Zobraziť na Strave ↗
+        </a>
+    {% else %}
+        <div class="no-pr text-center py-8">
+            <p class="text-4xl mb-2">{{ emoji }}</p>
+            <p class="font-semibold text-on-surface-variant text-sm">Žiadny záznam</p>
+            <p class="text-xs text-on-surface-variant mt-1 opacity-50">{{ motivate }}</p>
+        </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{% block content %}
+<div class="py-8 space-y-8">
+
+    {# ── header ── #}
+    <div class="flex items-end justify-between flex-wrap gap-3">
+        <div>
+            <p class="meta-label mb-1">Track AI</p>
+            <h1 class="font-headline font-extrabold text-3xl tracking-tight">Osobné rekordy</h1>
+            <p class="text-on-surface-variant text-sm mt-1">Tvoje najlepšie časy zo Stravy</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <span class="strava-pill">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                </svg>
+                Strava sync
+            </span>
+            <a href="/osobaky?refresh=1"
+               class="text-xs font-semibold text-on-surface-variant hover:text-primary transition-colors flex items-center gap-1">
+                <span class="material-symbols-outlined" style="font-size:15px">refresh</span>
+                Refresh
+            </a>
+        </div>
+    </div>
+
+    {# ── error banner ── #}
+    {% if error %}
+    <div class="rounded-2xl bg-red-900/20 border border-red-500/20 px-5 py-3 text-sm text-red-300">
+        {{ error }}
+    </div>
+    {% endif %}
+
+    {# ── PR grid — sprinter order: 400m first ── #}
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        {{ pr_card('400m',  '400',  'm',  '400', '', 'Zabehnúť 400m naplno!',     'c1') }}
+        {{ pr_card('800m',  '800',  'm',  '800', '', 'Zabehnúť 800m naplno!',     'c2') }}
+        {{ pr_card('5k',    '5',    'km', '5',   '', 'Zabi to na päťke!',          'c3') }}
+        {{ pr_card('10k',   '10',   'km', '10',  '', 'Daj si desiatku!',           'c4') }}
+        {{ pr_card('half',  '21.1', 'km', '21',  '', 'Polmaratón ťa čaká!',        'c5') }}
+        {{ pr_card('marathon','42.2','km','42',  '', 'Daj si maratón!',            'c6') }}
+    </div>
+
+    <p class="text-center text-xs text-on-surface-variant opacity-40 pb-4">
+        Osobné rekordy sa automaticky počítajú z tvojich Strava aktivít.
+    </p>
+
+</div>
+{% endblock %}

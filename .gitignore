@@ -1,0 +1,19 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Secrets - NIKDY nenahrávaj na GitHub!
+.env
+
+# Databáza a cache
+instance/
+cache/
+
+# Nahrané videá a stiahnutý model kostry (veľké súbory)
+static/uploads/
+models/
+
+# Claude Code nastavenia
+.claude/

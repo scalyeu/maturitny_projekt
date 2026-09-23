@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% from "trener/_vysledky.html" import pb_table, results_table, result_form %}
+{% block title %}Výsledky a osobné rekordy · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">{{ current_user.role_label }} · {{ current_user.display_name }}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Výsledky a osobné rekordy</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="#pridat" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Pridať výsledok</a>
+            <a href="{{ url_for('grafy.index') }}"
+               class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Grafy</a>
+        </div>
+    </div>
+
+    <!-- ── Tréner: žiadosť / potvrdený vzťah / bez trénera ── -->
+    {% if coach_pending %}
+    <section class="mb-9 bg-surface-container border border-white/10 border-l-2 p-6" style="border-left-color:#d9a23a">
+        <div class="flex items-start justify-between flex-wrap gap-5">
+            <div>
+                <p class="eyebrow mb-2" style="color:#d9a23a">Žiadosť trénera</p>
+                <p class="font-headline font-bold text-2xl text-on-surface mb-2">
+                    {{ coach.display_name }} <span class="mono text-[13px] font-normal text-on-surface-variant">({{ coach.username }})</span> ťa chce viesť ako tréner
+                </p>
+                <p class="text-on-surface-variant text-[13px] max-w-[60ch]">
+                    Po prijatí tréner uvidí tvoje tréningy, výsledky z pretekov, plán aj analýzy z videa a bude ti môcť
+                    plánovať tréningy. Kým žiadosť neprijmeš, nevidí nič. Odpojiť sa môžeš kedykoľvek – tu, v sekcii Výsledky.
+                </p>
+            </div>
+            <div class="flex items-center gap-2.5">
+                <form method="POST" action="{{ url_for('zverenec.accept_coach') }}">
+                    <button type="submit" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Prijať</button>
+                </form>
+                <form method="POST" action="{{ url_for('zverenec.reject_coach') }}">
+                    <button type="submit" class="border border-white/15 hover:border-[#e66767] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface hover:text-[#e66767] transition-colors">Odmietnuť</button>
+                </form>
+            </div>
+        </div>
+    </section>
+    {% elif coach %}
+    <section class="mb-9 flex items-center justify-between flex-wrap gap-4 border-b border-white/10 pb-6">
+        <p class="text-[13px] text-on-surface-variant">
+            <span class="eyebrow mr-2">Tréner</span>
+            <span class="text-on-surface">{{ coach.display_name }}</span>
+            <span class="mono">({{ coach.username }})</span> vidí tvoje tréningy, výsledky a analýzy.
+        </p>
+        <form method="POST" action="{{ url_for('zverenec.leave_coach') }}"
+              onsubmit="return confirm('Odpojiť sa od trénera {{ coach.username }}? Prestane vidieť tvoje údaje.');">
+            <button type="submit" class="eyebrow hover:text-[#e66767] transition-colors">Odpojiť sa od trénera</button>
+        </form>
+    </section>
+    {% else %}
+    <section class="mb-9 border-b border-white/10 pb-6">
+        <p class="text-[13px] text-on-surface-variant">
+            <span class="eyebrow mr-2">Tréner</span> Nemáš trénera. Povedz mu svoje používateľské meno
+            <span class="mono text-on-surface">{{ current_user.username }}</span> – jeho žiadosť sa objaví tu a potvrdíš ju jedným klikom.
+        </p>
+    </section>
+    {% endif %}
+
+    <!-- ── Osobné rekordy ── -->
+    <section>
+        {{ pb_table(pbs) }}
+    </section>
+
+    <!-- ── Výsledky + formulár ── -->
+    <section class="pt-11 grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-8">
+        <div class="lg:col-span-7">
+            {{ results_table(results, delete_endpoint='zverenec.delete_result', pbs=pbs) }}
+        </div>
+        <div class="lg:col-span-5">
+            {{ result_form(url_for('zverenec.add_result'), disciplines, other_discipline, today) }}
+        </div>
+    </section>
+
+</main>
+{% endblock %}

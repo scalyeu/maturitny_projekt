@@ -1,0 +1,162 @@
+{% extends "base.html" %}
+{% from "trener/_vysledky.html" import pb_table, results_table, result_form %}
+{% block title %}{{ athlete.display_name }} · Zverenec · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">
+                <a href="{{ url_for('trener.athletes') }}" class="hover:text-on-surface transition-colors">Zverenci</a>
+                · <span class="mono">{{ athlete.username }}</span>
+                {% if is_self %} · tvoje vlastné údaje{% endif %}
+            </p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ athlete.display_name }}</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ url_for('grafy.index', athlete_id=athlete.id) }}"
+               class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Grafy</a>
+            <a href="{{ url_for('planovanie.index', athlete_id=athlete.id) }}"
+               class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Plán</a>
+            {% if wa_search %}
+            <a href="{{ url_for('wa.search_page', athlete_id=athlete.id) }}"
+               class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Načítať z World Athletics</a>
+            {% else %}
+            <form method="POST" action="{{ url_for('wa.import_athlete', athlete_id=athlete.id) }}" class="inline">
+                <button type="submit" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Načítať z World Athletics</button>
+            </form>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── Čísla ── -->
+    <div class="grid grid-cols-3 gap-px bg-white/10 border border-white/10">
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Výsledkov</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ results|length }}</p>
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Posledný výsledok</p>
+            {% if results %}
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ results[0].result_s|cas }}</p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">{{ results[0].discipline }} · {{ results[0].date.strftime('%d.%m.%Y') }}</p>
+            {% else %}
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface"><span class="text-on-surface-variant text-[20px] align-middle">—</span></p>
+            {% endif %}
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Najbližší tréning</p>
+            {% if next_training %}
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ next_training.date.strftime('%d.%m.') }}</p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2 truncate">{{ next_training.title }}</p>
+            {% else %}
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface"><span class="text-on-surface-variant text-[20px] align-middle">—</span></p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">nič naplánované</p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ── Osobné rekordy ── -->
+    <section class="pt-11">
+        {{ pb_table(pbs) }}
+    </section>
+
+    <!-- ── Výsledky + formulár ── -->
+    <section class="pt-11 grid grid-cols-1 lg:grid-cols-12 gap-x-10 gap-y-8">
+        <div class="lg:col-span-7">
+            {{ results_table(results, delete_endpoint='trener.delete_result', pbs=pbs) }}
+        </div>
+        <div class="lg:col-span-5">
+            {{ result_form(url_for('trener.add_result', athlete_id=athlete.id), disciplines, other_discipline, today) }}
+        </div>
+    </section>
+
+    <!-- ── Analýzy z videa ── -->
+    <section class="pt-11 grid grid-cols-1 lg:grid-cols-2 gap-x-10 gap-y-8">
+        <div>
+            <div class="rule">
+                <p class="eyebrow">Analýzy techniky</p>
+                <a href="{{ url_for('video_page') }}" class="eyebrow hover:text-on-surface transition-colors">Otvoriť Video →</a>
+            </div>
+            {% if videos %}
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="py-2.5 text-left">Dátum</th>
+                        <th class="py-2.5 text-left">Meranie</th>
+                        <th class="py-2.5 text-right">Kontakt</th>
+                        <th class="py-2.5 text-right">Kadencia</th>
+                        <th class="py-2.5 text-right">Asym.</th>
+                    </tr>
+                </thead>
+                <tbody class="text-[13px]">
+                    {% for v in videos %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 mono text-on-surface-variant whitespace-nowrap">{{ v.created_at.strftime('%d.%m.%Y') }}</td>
+                        <td class="py-3 text-on-surface truncate max-w-[18ch]" title="{{ v.label or v.original_name or '' }}">{{ v.label or v.original_name or 'Meranie' }}</td>
+                        <td class="py-3 mono text-right text-on-surface">{{ '%.0f'|format(v.contact_ms_mean) if v.contact_ms_mean else '—' }} <span class="text-on-surface-variant text-[11px]">ms</span></td>
+                        <td class="py-3 mono text-right text-on-surface">{{ '%.0f'|format(v.cadence_spm) if v.cadence_spm else '—' }}</td>
+                        <td class="py-3 mono text-right text-on-surface">{{ '%.1f'|format(v.asymmetry_pct) if v.asymmetry_pct is not none else '—' }} <span class="text-on-surface-variant text-[11px]">%</span></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="mono text-[11px] text-on-surface-variant mt-3">Detail merania otvoríš v histórii na stránke Video.</p>
+            {% else %}
+            <p class="text-on-surface-variant py-4">Zatiaľ žiadne analýzy techniky.</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <div class="rule">
+                <p class="eyebrow">Prekážky</p>
+                <a href="{{ url_for('hurdles_page') }}" class="eyebrow hover:text-on-surface transition-colors">Otvoriť Prekážky →</a>
+            </div>
+            {% if hurdles %}
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="py-2.5 text-left">Dátum</th>
+                        <th class="py-2.5 text-left">Meranie</th>
+                        <th class="py-2.5 text-right">Prekážok</th>
+                        <th class="py-2.5 text-right">Medzičas</th>
+                        <th class="py-2.5 text-left pl-4">Kroky</th>
+                    </tr>
+                </thead>
+                <tbody class="text-[13px]">
+                    {% for h in hurdles %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 mono text-on-surface-variant whitespace-nowrap">{{ h.created_at.strftime('%d.%m.%Y') }}</td>
+                        <td class="py-3 text-on-surface truncate max-w-[18ch]" title="{{ h.label or h.original_name or '' }}">{{ h.label or h.original_name or 'Meranie' }}{% if h.discipline %} <span class="text-on-surface-variant">· {{ h.discipline }}</span>{% endif %}</td>
+                        <td class="py-3 mono text-right text-on-surface">{{ h.hurdles_detected if h.hurdles_detected is not none else '—' }}</td>
+                        <td class="py-3 mono text-right text-on-surface">{{ '%.2f'|format(h.interval_mean_s) if h.interval_mean_s else '—' }} <span class="text-on-surface-variant text-[11px]">s</span></td>
+                        <td class="py-3 pl-4 mono text-on-surface-variant">{{ h.steps_pattern or '—' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-on-surface-variant py-4">Zatiaľ žiadne analýzy prekážok.</p>
+            {% endif %}
+        </div>
+    </section>
+
+    {% if can_detach and not is_self %}
+    <section class="pt-11">
+        <div class="rule"><p class="eyebrow">Vzťah</p></div>
+        <div class="flex items-center justify-between flex-wrap gap-4">
+            <p class="text-on-surface-variant text-[13px] max-w-[60ch]">
+                Odpojením prestaneš vidieť tréningy, analýzy a výsledky tohto zverenca. Jeho údaje zostanú jemu.
+            </p>
+            <form method="POST" action="{{ url_for('trener.detach_athlete', athlete_id=athlete.id) }}"
+                  onsubmit="return confirm('Odpojiť zverenca {{ athlete.username }}?');">
+                <button type="submit" class="border border-white/15 hover:border-[#e66767] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-[#e66767] transition-colors">Odpojiť zverenca</button>
+            </form>
+        </div>
+    </section>
+    {% endif %}
+
+</main>
+{% endblock %}

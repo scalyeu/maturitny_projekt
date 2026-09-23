@@ -371,7 +371,7 @@
             <a href="{{ url_for('auth.change_password') }}" title="Zmena hesla"
                class="mono text-[12px] text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ current_user.username }}</a>
             <span class="text-white/20">·</span>
-            <a href="{{ url_for('auth.logout') }}" class="navlink">Odhlásiť</a>
+            <form method="post" action="{{ url_for('auth.logout') }}" class="inline m-0"><button type="submit" class="navlink">Odhlásiť</button></form>
             {% else %}
             <a href="{{ url_for('auth.login') }}" class="navlink {{ 'active' if request.endpoint == 'auth.login' else '' }}">Prihlásiť</a>
             <a href="{{ url_for('auth.register') }}"
@@ -409,7 +409,7 @@
                 <span class="eyebrow">{{ current_user.role_label }}</span>
                 <a href="{{ url_for('auth.change_password') }}" class="mono text-[12px] text-on-surface">{{ current_user.username }}</a>
             </span>
-            <a href="{{ url_for('auth.logout') }}" class="navlink">Odhlásiť</a>
+            <form method="post" action="{{ url_for('auth.logout') }}" class="inline m-0"><button type="submit" class="navlink">Odhlásiť</button></form>
         </div>
         {% else %}
         <a href="{{ url_for('auth.login') }}"

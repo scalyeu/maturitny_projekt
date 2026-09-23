@@ -253,8 +253,11 @@ def login():
                            show_admin_hint=_default_admin_pending())
 
 
-@bp.route('/odhlasenie')
+@bp.route('/odhlasenie', methods=['GET', 'POST'])
 def logout():
+    # Odhlásiť sa dá len formulárom (POST) – cudzia stránka tak nemôže používateľa odhlásiť cez <img src>.
+    if request.method != 'POST':
+        return redirect(url_for('index'))
     session.clear()
     session.modified = True
     flash('Bol si odhlásený.', 'success')

@@ -71,7 +71,7 @@
     <!-- ── Mriežka Po–Ne ── -->
     <div class="grid grid-cols-7 gap-px bg-white/10 border border-white/10">
         {% for d in WEEKDAYS_SHORT_SK %}
-        <div class="bg-surface-container-low px-2 py-2 eyebrow {% if loop.index > 5 %}text-right{% endif %}">{{ d }}</div>
+        <div class="bg-surface-container-low px-2 py-2 eyebrow">{{ d }}</div>
         {% endfor %}
 
         {% for week in weeks %}{% for d in week %}

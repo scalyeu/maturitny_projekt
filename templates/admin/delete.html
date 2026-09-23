@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Zmazať účet · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12 max-w-[640px]">
+
+    <div class="mb-8">
+        <p class="eyebrow mb-2">
+            <a href="{{ url_for('admin_panel.users') }}" class="hover:text-on-surface transition-colors">Používatelia</a>
+            · zmazanie účtu
+        </p>
+        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">
+            Zmazať <span class="mono normal-case font-medium">{{ user.username }}</span>?
+        </h1>
+        <p class="text-[13px] text-on-surface-variant mt-3 leading-relaxed">
+            {{ user.role_label }}{% if user.full_name %} · {{ user.full_name }}{% endif %}
+            · vytvorený {{ user.created_at.strftime('%d.%m.%Y') }}
+        </p>
+    </div>
+
+    {% if blocker %}
+    <div class="bg-surface-container border-l-2 border-[#e66767] px-5 py-4 mb-8">
+        <p class="eyebrow mb-1" style="color:#e66767">Nedá sa zmazať</p>
+        <p class="text-[13px] text-on-surface">{{ blocker }}</p>
+    </div>
+    {% endif %}
+
+    <div class="rule"><p class="eyebrow">Spolu s účtom sa nenávratne zmaže</p></div>
+    <table class="w-full mb-8">
+        <tbody class="text-[13px]">
+            {% for label, key in [('Tréningy', 'trainings'), ('Výsledky z pretekov', 'results'),
+                                  ('Analýzy videa (aj súbory)', 'videos'), ('Analýzy prekážok (aj súbory)', 'hurdles'),
+                                  ('Plánované tréningy (ako zverenec)', 'planned_as_athlete'),
+                                  ('Plánované tréningy pre zverencov (ako tréner)', 'planned_as_coach'),
+                                  ('Biometrické záznamy', 'biometrics'), ('AI správy', 'chat'),
+                                  ('Profil', 'profile'), ('Strava tokeny', 'strava')] %}
+            <tr class="border-b border-white/5">
+                <td class="py-2.5 text-on-surface-variant">{{ label }}</td>
+                <td class="py-2.5 text-right mono {{ 'text-on-surface' if data[key] else 'text-on-surface-variant' }}">{{ data[key] }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <p class="text-[13px] text-on-surface-variant mb-8">
+        Výsledky iných atlétov, ktoré tento používateľ zapísal, ostávajú – iba bez autora.
+    </p>
+
+    {% if not blocker %}
+    <form method="POST" class="bg-surface-container border border-white/10 p-6 space-y-5">
+        <div>
+            <label for="confirm">Na potvrdenie opíš používateľské meno</label>
+            <input type="text" id="confirm" name="confirm" placeholder="{{ user.username }}"
+                   autocomplete="off" autocapitalize="off" spellcheck="false" required autofocus>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <button type="submit"
+                    class="bg-[#e66767] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-[#0b0b0c] hover:bg-[#f07a7a] transition-colors">
+                Nenávratne zmazať
+            </button>
+            <a href="{{ url_for('admin_panel.edit_user', user_id=user.id) }}"
+               class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Späť</a>
+        </div>
+    </form>
+    {% else %}
+    <div class="flex flex-wrap items-center gap-2.5">
+        <a href="{{ url_for('admin_panel.edit_user', user_id=user.id) }}"
+           class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Upraviť účet</a>
+        <a href="{{ url_for('admin_panel.users') }}"
+           class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Späť na zoznam</a>
+    </div>
+    {% endif %}
+
+</main>
+{% endblock %}

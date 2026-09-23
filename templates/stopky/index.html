@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+    <div class="mb-8">
+        <p class="eyebrow mb-2">{{ eyebrow }}</p>
+        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+    </div>
+    <p class="eyebrow">Pripravuje sa</p>
+    {% if not current_user %}
+    <p class="text-[13px] text-on-surface-variant mt-6">
+        Stopky fungujú aj bez prihlásenia. Ak chceš výsledok uložiť k zverencovi,
+        <a href="{{ url_for('auth.login') }}" class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">prihlás sa</a>.
+    </p>
+    {% endif %}
+</main>
+{% endblock %}

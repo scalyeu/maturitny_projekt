@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+    <div class="mb-8">
+        <p class="eyebrow mb-2">{{ eyebrow }}</p>
+        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+    </div>
+
+    <p class="eyebrow">Pripravuje sa</p>
+
+    {% if users %}
+    <div class="mt-8">
+        <div class="rule"><p class="eyebrow">Účty · {{ users|length }}</p></div>
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-white/10">
+                    <th class="py-2.5 text-left">Používateľské meno</th>
+                    <th class="py-2.5 text-left">Meno</th>
+                    <th class="py-2.5 text-left">Rola</th>
+                    <th class="py-2.5 text-left">Tréner</th>
+                    <th class="py-2.5 text-right">Vytvorený</th>
+                </tr>
+            </thead>
+            <tbody class="text-[13px]">
+                {% for u in users %}
+                <tr class="border-b border-white/5">
+                    <td class="py-3 mono text-on-surface">{{ u.username }}</td>
+                    <td class="py-3 text-on-surface-variant">{{ u.full_name or '—' }}</td>
+                    <td class="py-3"><span class="eyebrow">{{ u.role_label }}</span></td>
+                    <td class="py-3 mono text-on-surface-variant">{{ u.coach.username if u.coach else '—' }}</td>
+                    <td class="py-3 text-right mono text-on-surface-variant">{{ u.created_at.strftime('%d.%m.%Y') }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+</main>
+{% endblock %}

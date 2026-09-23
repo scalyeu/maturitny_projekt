@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Registrácia · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12 max-w-[440px] mx-auto">
+    <div class="mb-8">
+        <p class="eyebrow mb-2">Účet</p>
+        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Registrácia</h1>
+        <p class="text-[13px] text-on-surface-variant mt-3 leading-relaxed">
+            Zverenec vidí len svoje údaje a tréner ho pridá podľa používateľského mena.
+            Tréner spravuje zverencov, ich výsledky a plán tréningov.
+        </p>
+    </div>
+
+    <form method="POST" class="bg-surface-container border border-white/10 p-6 space-y-5">
+        <div>
+            <label for="username">Používateľské meno</label>
+            <input type="text" id="username" name="username" value="{{ form.username }}" placeholder="napr. jan.novak"
+                   autocomplete="username" autocapitalize="off" spellcheck="false" minlength="3" maxlength="32" required autofocus>
+            <p class="mono text-[10px] text-on-surface-variant mt-1.5">3–32 znakov: a–z, 0–9, bodka, pomlčka, podčiarkovník</p>
+        </div>
+        <div>
+            <label for="full_name">Meno a priezvisko</label>
+            <input type="text" id="full_name" name="full_name" value="{{ form.full_name }}" placeholder="nepovinné" maxlength="120" autocomplete="name">
+        </div>
+
+        <div>
+            <p class="eyebrow mb-2">Rola</p>
+            <div class="grid grid-cols-2 gap-px bg-white/10 border border-white/10">
+                {% for value, label, sub in [('zverenec', 'Zverenec', 'atlét, zapisuje si tréningy'), ('trener', 'Tréner', 'spravuje zverencov a plán')] %}
+                <label class="bg-surface-container-low px-4 py-3.5 cursor-pointer flex items-start gap-3 hover:bg-surface-container-high transition-colors">
+                    <input type="radio" name="role" value="{{ value }}" class="mt-1" {% if form.role == value %}checked{% endif %}>
+                    <span>
+                        <span class="block font-headline font-bold text-on-surface">{{ label }}</span>
+                        <span class="block text-[12px] text-on-surface-variant">{{ sub }}</span>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label for="password">Heslo</label>
+                <input type="password" id="password" name="password" autocomplete="new-password" minlength="6" required>
+            </div>
+            <div>
+                <label for="password2">Heslo znova</label>
+                <input type="password" id="password2" name="password2" autocomplete="new-password" minlength="6" required>
+            </div>
+        </div>
+
+        <button type="submit" class="w-full bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+            Vytvoriť účet
+        </button>
+    </form>
+
+    <p class="mt-5 text-[13px] text-on-surface-variant">
+        Už máš účet?
+        <a href="{{ url_for('auth.login') }}" class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">Prihlásenie →</a>
+    </p>
+</main>
+{% endblock %}

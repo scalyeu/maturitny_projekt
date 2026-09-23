@@ -302,9 +302,41 @@ Zigo_sportovy_prediktor/
 
 ---
 
+## Účty a úrovne prístupu
+
+Aplikácia má štyri úrovne prístupu (`auth.py`, `models.py`):
+
+| Rola | Čo vidí |
+|---|---|
+| neprihlásený | úvodná stránka, Stopky (bez ukladania) |
+| **zverenec** | len svoje údaje: video, prekážky, tréningy, plán od trénera, výsledky, grafy, AI, Strava |
+| **tréner** | to isté pre seba + údaje svojich zverencov (`user.coach_id`), správa výsledkov a plánu |
+| **administrátor** | všetko + správa používateľov (`/admin/pouzivatelia`) |
+
+- Pri prvom spustení sa vytvorí účet **`admin` / `admin`** (`must_change_password=True`) —
+  appka ho po prihlásení pustí len na zmenu hesla. Nápoveda na prihlasovacej stránke zmizne
+  po zmene hesla.
+- Registrácia (`/registracia`) ponúka roly zverenec a tréner; admina vie vytvoriť len admin.
+- Heslá sú hašované (`werkzeug.security`). Session podpisuje `SECRET_KEY` z `.env`; ak chýba,
+  appka si ho raz vygeneruje do `instance/secret_key`.
+- Každý dotaz na údaje je filtrovaný cez `user_id` (`auth.athlete_ids_visible_to`). Staré riadky
+  bez `user_id` (z verzie pred účtami) vidí len admin.
+
+Premenné prostredia pre spúšťanie: `ATLETCOACH_PORT` (5001), `ATLETCOACH_RELOAD=0` vypne reloader,
+`FLASK_DEBUG=0` vypne debug (pri nasadení povinné), `ATLETCOACH_DB_URI` prepíše cestu k databáze.
+
+---
+
 ## Databázové modely
 
 ```python
+User            # username, password_hash, role (zverenec|trener|admin), full_name,
+                # coach_id -> user.id, world_athletics_id, must_change_password
+RaceResult      # user_id, discipline, result_s, date, competition, place, wind,
+                # source (manual|world_athletics|stopky), note, created_by
+PlannedTraining # athlete_id, coach_id, date, title, description, completed,
+                # completed_at, athlete_note, training_log_id
+# Všetky pôvodné modely majú navyše user_id -> user.id (vlastník riadku):
 BiometricLog    # date, hrv, recovery, rhr
 TrainingLog     # date, training_type, distance_km, duration_min, duration_sec,
                 # intervals_data, notes
@@ -366,13 +398,14 @@ Prvá inštalácia trvá aj pár minút — `mediapipe` a `opencv-python` sú ve
 V koreni projektu vytvor súbor `.env`:
 
 ```env
-# Flask
+# Flask – podpisuje prihlasovacie cookie; ak chýba, vygeneruje sa do instance/secret_key
 SECRET_KEY=tvoj-tajny-kluc-zmen-ma
 
 # Strava OAuth — registruj appku na https://www.strava.com/settings/api
+# (appka beží na porte 5001, rovnaký port nastav aj v Strave ako callback)
 STRAVA_CLIENT_ID=tvoje_client_id
 STRAVA_CLIENT_SECRET=tvoj_client_secret
-STRAVA_REDIRECT_URI=http://localhost:5000/strava/callback
+STRAVA_REDIRECT_URI=http://localhost:5001/strava/callback
 
 # Groq API — získaj na https://console.groq.com/keys
 GROQ_API_KEY=gsk_tvoj_groq_kluc
@@ -492,7 +525,11 @@ nad výsledkami. Ak nesedí, správnu hodnotu sa dá prepísať v poli *Skutočn
 
 ## Známe obmedzenia
 
-- Aplikácia je single-user. Neuvažuje sa s viacerými atlétmi súbežne.
+- Nahrané videá, prekryvné videá a kľúčové snímky sa servírujú zo `static/uploads/videos`
+  bez kontroly prihlásenia. Názvy súborov sú náhodné (UUID), takže sa nedajú uhádnuť, ale kto
+  má odkaz, video si otvorí. Pri nasadení mimo lokálnej siete to treba riešiť (napr. presun
+  mimo `static/` a route s kontrolou oprávnení).
+- Tréner pridáva zverenca podľa používateľského mena bez potvrdenia zo strany zverenca.
 - Strava token sa ukladá v DB v plaintexte (na lokálnom použití OK, pre produkciu by mal byť šifrovaný).
 - AI predikčný model (klasické ML na predpoveď pretekového času) je v plánoch — aktuálne ho nahrádza Groq chat asistent.
 - Analýza videa počíta uhly v rovine obrazu (2D). Platia len ak je kamera naozaj z boku;

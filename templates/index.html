@@ -151,10 +151,12 @@
         <div>
             <div class="rule"><p class="eyebrow">Rýchly prístup</p></div>
             {% set links = [
-                ('log_data',   'Zaloguj WHOOP dáta', 'HRV, recovery, pokojový tep'),
-                ('trainings',  'Zaloguj tréning',    'Interval, tempo, šprint'),
-                ('ai_portal',  'AI tréner',          'Readiness + chat'),
-                ('osobaky',    'Osobné rekordy',     '400 m, 800 m, 5 km, 10 km…'),
+                ('planovanie.index', 'Plán od trénera',       'Naplánované tréningy a ich splnenie'),
+                ('zverenec.results', 'Výsledky a osobné rekordy', 'Preteky, PB podľa disciplíny'),
+                ('trainings',        'Zaloguj tréning',       'Interval, tempo, šprint'),
+                ('log_data',         'Zaloguj WHOOP dáta',    'HRV, recovery, pokojový tep'),
+                ('ai_portal',        'AI tréner',             'Readiness + chat'),
+                ('osobaky',          'Strava osobáky',        '400 m, 800 m, 5 km, 10 km…'),
             ] %}
             {% for endpoint, title, sub in links %}
             <a href="{{ url_for(endpoint) }}"

@@ -60,6 +60,21 @@
                         <input type="text" id="label" placeholder="napr. 60 m rozbeh, tartan" maxlength="120">
                     </div>
 
+                    {# Výber zverenca vidí len tréner/admin – analýza sa uloží pod jeho účet. #}
+                    {% if athletes and athletes|length > 1 %}
+                    <div>
+                        <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Zverenec</label>
+                        <select id="athlete_id" name="athlete_id" class="w-full" data-heights='{{ (athlete_heights or {})|tojson }}'>
+                            {% for a in athletes %}
+                            <option value="{{ a.id }}" {% if a.id == current_user.id %}selected{% endif %}>
+                                {{ a.username }}{% if a.id == current_user.id %} (ja){% elif a.full_name %} – {{ a.full_name }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <p class="text-xs text-on-surface-variant mt-1">Analýza sa uloží k vybranému zverencovi; výška sa predvyplní z jeho profilu.</p>
+                    </div>
+                    {% endif %}
+
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="block text-xs font-bold text-on-surface-variant uppercase tracking-wider mb-2">Výška (cm)</label>
@@ -161,6 +176,7 @@
                                     {{ h.created_at.strftime('%d.%m.%Y %H:%M') }} ·
                                     {{ h.steps_detected or 0 }} krokov ·
                                     {{ '%.0f'|format(h.fps or 0) }} fps
+                                    {% if owner_names %} · <span class="text-on-surface">{{ owner_names.get(h.user_id, 'bez účtu') }}</span>{% endif %}
                                 </p>
                             </div>
                             <div class="text-right flex-shrink-0">
@@ -415,6 +431,16 @@
         pickClear.classList.remove('hidden');
     });
 
+    // ── výber zverenca (tréner): výška sa predvyplní z jeho profilu ──
+    const athletePicker = document.getElementById('athlete_id');
+    if (athletePicker) {
+        const heights = JSON.parse(athletePicker.dataset.heights || '{}');
+        athletePicker.addEventListener('change', () => {
+            const h = heights[athletePicker.value];
+            document.getElementById('height_cm').value = h ? Math.round(h) : '';
+        });
+    }
+
     // ── odoslanie ───────────────────────────────────────────────────
     form.addEventListener('submit', e => {
         e.preventDefault();
@@ -425,6 +451,8 @@
         fd.append('video', f);
         fd.append('label', document.getElementById('label').value);
         fd.append('height_cm', document.getElementById('height_cm').value);
+        const athleteSel = document.getElementById('athlete_id');
+        if (athleteSel) fd.append('athlete_id', athleteSel.value);
         fd.append('fps_override', document.getElementById('fps_override').value);
         fd.append('phase', document.getElementById('phase').value);
         fd.append('click_x', document.getElementById('click_x').value);

@@ -192,6 +192,9 @@
             height: 2px;
             background: var(--volt);
         }
+        /* Rozbaľovacie menu v hlavičke je <details> bez skriptu – len bez trojuholníka. */
+        .navdrop summary { list-style: none; }
+        .navdrop summary::-webkit-details-marker { display: none; }
 
         /* ── Plochy ──
            Žiadne tiene ani rozmazané sklo — len linka a odstup plochy. */
@@ -292,50 +295,128 @@
             Atlet<span style="color:var(--volt)">Coach</span>
         </a>
 
-        {% set nav_items = [
-            ('index',        'Domov'),
-            ('video_page',   'Video'),
-            ('hurdles_page', 'Prekážky'),
+        {# ── Navigácia podľa roly ──
+           Názvy endpointov sú kontrakt: každý blueprint ich musí definovať, inak url_for spadne. #}
+        {% set role = current_user.role if current_user else none %}
+        {% if role is none %}
+            {% set nav_items = [
+                ('index',       'Domov'),
+                ('stopky.page', 'Stopky'),
+            ] %}
+        {% elif role == 'zverenec' %}
+            {% set nav_items = [
+                ('index',            'Domov'),
+                ('video_page',       'Video'),
+                ('hurdles_page',     'Prekážky'),
+                ('stopky.page',      'Stopky'),
+                ('trainings',        'Tréningy'),
+                ('planovanie.index', 'Plán'),
+                ('zverenec.results', 'Výsledky'),
+                ('grafy.index',      'Grafy'),
+                ('log_data',         'Logovanie'),
+                ('ai_portal',        'AI'),
+            ] %}
+        {% else %}
+            {% set nav_items = [
+                ('index',            'Domov'),
+                ('trener.athletes',  'Zverenci'),
+                ('planovanie.index', 'Plán'),
+                ('grafy.index',      'Grafy'),
+                ('video_page',       'Video'),
+                ('hurdles_page',     'Prekážky'),
+                ('stopky.page',      'Stopky'),
+                ('trainings',        'Tréningy'),
+                ('ai_portal',        'AI'),
+            ] %}
+            {% if role == 'admin' %}
+                {% set nav_items = nav_items + [('admin_panel.users', 'Používatelia')] %}
+            {% endif %}
+        {% endif %}
+        {% set strava_items = [
             ('dashboard',    'Dashboard'),
-            ('log_data',     'Logovanie'),
-            ('trainings',    'Tréningy'),
-            ('ai_portal',    'AI'),
             ('osobaky',      'Osobáky'),
             ('heatmap',      'Heatmapa'),
+            ('strava_login', 'Pripojiť Stravu'),
         ] %}
+        {% set strava_endpoints = ['dashboard', 'osobaky', 'heatmap', 'strava_login', 'strava_authorized'] %}
 
-        <nav class="hidden lg:flex items-center gap-5">
+        <nav class="hidden xl:flex items-center gap-4">
             {% for endpoint, label in nav_items %}
-            <a href="{{ url_for(endpoint) }}"
-               class="navlink {{ 'active' if request.endpoint == endpoint else '' }}">{{ label }}</a>
+            {% set active = request.endpoint == endpoint
+                            or (request.blueprint and '.' in endpoint and endpoint.split('.')[0] == request.blueprint) %}
+            <a href="{{ url_for(endpoint) }}" class="navlink {{ 'active' if active else '' }}">{{ label }}</a>
             {% endfor %}
+
+            {% if current_user %}
+            <details class="navdrop relative">
+                <summary class="navlink cursor-pointer flex items-center gap-1.5 {{ 'active' if request.endpoint in strava_endpoints else '' }}">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="#fc4c02">
+                        <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
+                    </svg>
+                    Strava <span class="text-[9px]">▾</span>
+                </summary>
+                <div class="absolute right-0 top-full mt-[13px] w-48 bg-[#0b0b0c] border border-white/10 py-1 z-50">
+                    {% for endpoint, label in strava_items %}
+                    <a href="{{ url_for(endpoint) }}"
+                       class="block px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors">{{ label }}</a>
+                    {% endfor %}
+                </div>
+            </details>
+            {% endif %}
         </nav>
 
-        <a href="{{ url_for('strava_login') }}"
-           class="hidden lg:flex items-center gap-2 border border-white/15 hover:border-white/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant hover:text-on-surface transition-colors">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="#fc4c02">
-                <path d="M15.387 17.944l-2.089-4.116h-3.065L15.387 24l5.15-10.172h-3.066m-7.008-5.599l2.836 5.598h4.172L10.463 0l-7 13.828h4.169"/>
-            </svg>
-            Strava
-        </a>
+        <div class="hidden xl:flex items-center gap-3 flex-shrink-0">
+            {% if current_user %}
+            <span class="eyebrow">{{ current_user.role_label }}</span>
+            <a href="{{ url_for('auth.change_password') }}" title="Zmena hesla"
+               class="mono text-[12px] text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ current_user.username }}</a>
+            <span class="text-white/20">·</span>
+            <a href="{{ url_for('auth.logout') }}" class="navlink">Odhlásiť</a>
+            {% else %}
+            <a href="{{ url_for('auth.login') }}" class="navlink {{ 'active' if request.endpoint == 'auth.login' else '' }}">Prihlásiť</a>
+            <a href="{{ url_for('auth.register') }}"
+               class="border border-white/15 hover:border-white/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant hover:text-on-surface transition-colors">
+                Registrácia
+            </a>
+            {% endif %}
+        </div>
 
-        <button id="mobile-menu-btn" class="lg:hidden p-2 -mr-2 text-on-surface-variant hover:text-on-surface transition-colors">
+        <button id="mobile-menu-btn" class="xl:hidden p-2 -mr-2 text-on-surface-variant hover:text-on-surface transition-colors">
             <span class="material-symbols-outlined">menu</span>
         </button>
     </div>
 
-    <div id="mobile-menu" class="hidden lg:hidden border-t border-white/10 bg-[#0b0b0c]">
+    <div id="mobile-menu" class="hidden xl:hidden border-t border-white/10 bg-[#0b0b0c]">
         {% for endpoint, label in nav_items %}
+        {% set active = request.endpoint == endpoint
+                        or (request.blueprint and '.' in endpoint and endpoint.split('.')[0] == request.blueprint) %}
         <a href="{{ url_for(endpoint) }}"
            class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] border-b border-white/5
-                  {{ 'text-on-surface' if request.endpoint == endpoint else 'text-on-surface-variant' }}">
-            {% if request.endpoint == endpoint %}<span style="color:var(--volt)">/ </span>{% endif %}{{ label }}
+                  {{ 'text-on-surface' if active else 'text-on-surface-variant' }}">
+            {% if active %}<span style="color:var(--volt)">/ </span>{% endif %}{{ label }}
         </a>
         {% endfor %}
-        <a href="{{ url_for('strava_login') }}"
-           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em]" style="color:#fc4c02">
-            Pripojiť Stravu
-        </a>
+
+        {% if current_user %}
+        <p class="eyebrow px-5 pt-4 pb-2">Strava</p>
+        {% for endpoint, label in strava_items %}
+        <a href="{{ url_for(endpoint) }}"
+           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] border-b border-white/5
+                  {{ 'text-on-surface' if request.endpoint == endpoint else 'text-on-surface-variant' }}">{{ label }}</a>
+        {% endfor %}
+        <div class="px-5 py-4 flex items-center justify-between gap-4">
+            <span class="flex items-baseline gap-2">
+                <span class="eyebrow">{{ current_user.role_label }}</span>
+                <a href="{{ url_for('auth.change_password') }}" class="mono text-[12px] text-on-surface">{{ current_user.username }}</a>
+            </span>
+            <a href="{{ url_for('auth.logout') }}" class="navlink">Odhlásiť</a>
+        </div>
+        {% else %}
+        <a href="{{ url_for('auth.login') }}"
+           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] border-b border-white/5 text-on-surface">Prihlásiť</a>
+        <a href="{{ url_for('auth.register') }}"
+           class="block px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface-variant">Registrácia</a>
+        {% endif %}
     </div>
 </header>
 

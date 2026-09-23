@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}AtletCoach{% endblock %}
+
+{% block content %}
+<main class="pb-8">
+
+    <!-- ── Úvod ── -->
+    <section class="pt-14 pb-12 border-b border-white/10">
+        <p class="eyebrow mb-4">Analýza bežeckej techniky z videa</p>
+        <h1 class="font-headline font-black uppercase leading-[0.88] tracking-[-0.035em]
+                   text-[58px] sm:text-[84px] lg:text-[104px] text-on-surface">
+            Atlet<span style="color:var(--volt)">Coach</span>
+        </h1>
+        <div class="mt-7 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-7">
+            <p class="text-on-surface-variant max-w-[48ch] leading-relaxed">
+                Pre trénerov a ich zverencov. Appka z videa vyčíta čas kontaktu so zemou, kadenciu
+                a asymetriu, pri prekážkach odmeria medzičasy a kroky. Tréner plánuje tréningy,
+                eviduje výsledky z pretekov a sleduje vývoj výkonnosti v grafoch.
+            </p>
+            <div class="flex flex-wrap gap-2.5">
+                <a href="{{ url_for('auth.login') }}"
+                   class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+                    Prihlásiť sa
+                </a>
+                <a href="{{ url_for('auth.register') }}"
+                   class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Registrovať
+                </a>
+                <a href="{{ url_for('stopky.page') }}"
+                   class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors">
+                    Vyskúšať stopky
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ── Čo appka robí ── -->
+    <section class="py-11 border-b border-white/10">
+        <div class="rule"><p class="eyebrow">Čo appka robí</p></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10 border border-white/10">
+            {% set blocks = [
+                ('01', 'Technika z videa',
+                 'Natoč sa spomalene z boku. Softvér rozpozná postavu bežca, sleduje chodidlá voči zemi a pre každý krok vyčíta kontakt so zemou, letovú fázu, frekvenciu, dĺžku kroku a uhly v kĺboch.'),
+                ('02', 'Prekážky',
+                 'Z bežného videa prekážkového behu odmeria medzičasy medzi prekážkami a spočíta kroky medzi nimi. Pri 400 m, 110 m a 100 m vyjde aj rýchlosť medzi prekážkami.'),
+                ('03', 'Tréner a zverenci',
+                 'Tréner spravuje zverencov, ich výsledky z pretekov a osobné rekordy (aj z World Athletics), v kalendári plánuje tréningy a v grafoch sleduje vývoj výkonnosti. Zverenec vidí len svoje údaje.'),
+                ('04', 'Stopky s fotobunkou',
+                 'Stopky s kamerou telefónu alebo notebooku: virtuálna fotobunka zastaví čas v okamihu, keď bežec pretne čiaru v obraze. Funguje aj bez prihlásenia.'),
+            ] %}
+            {% for num, title, text in blocks %}
+            <div class="bg-surface-container px-5 py-7">
+                <p class="mono text-[11px] text-on-surface-variant mb-5">{{ num }}</p>
+                <p class="font-headline font-bold text-lg text-on-surface leading-tight mb-3">{{ title }}</p>
+                <p class="text-[13px] text-on-surface-variant leading-relaxed">{{ text }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <!-- ── Úrovne prístupu ── -->
+    <section class="py-11">
+        <div class="rule"><p class="eyebrow">Štyri úrovne prístupu</p></div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-6">
+            {% set levels = [
+                ('Neprihlásený', 'Stopky s fotobunkou bez ukladania.'),
+                ('Zverenec', 'Vlastné prihlásenie, zápis tréningov, analýza videa, plán od trénera, výsledky a grafy – len svoje údaje.'),
+                ('Tréner', 'Zverenci, výsledky z pretekov a osobné rekordy, plánovanie tréningov v kalendári, analýzy videí zverencov.'),
+                ('Administrátor', 'Správa používateľských účtov a rolí.'),
+            ] %}
+            {% for title, text in levels %}
+            <div class="flex items-baseline justify-between gap-4 py-4 border-b border-white/10">
+                <div>
+                    <p class="font-headline font-semibold text-on-surface">{{ title }}</p>
+                    <p class="text-[13px] text-on-surface-variant">{{ text }}</p>
+                </div>
+                <span class="mono text-on-surface-variant">{{ '%02d'|format(loop.index) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+</main>
+{% endblock %}

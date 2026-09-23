@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Prístup zamietnutý · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-16 pb-12">
+    <p class="eyebrow mb-2">Chyba 403</p>
+    <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Na toto nemáš oprávnenie</h1>
+    <p class="text-on-surface-variant mt-4 max-w-[52ch]">
+        Táto stránka je určená inej roli, alebo sa snažíš pozrieť údaje, ktoré nepatria tebe ani tvojim zverencom.
+    </p>
+    <div class="mt-8 flex flex-wrap gap-2.5">
+        <a href="{{ url_for('index') }}" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Domov</a>
+        {% if not current_user %}
+        <a href="{{ url_for('auth.login') }}"
+           class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Prihlásiť sa</a>
+        {% endif %}
+    </div>
+</main>
+{% endblock %}

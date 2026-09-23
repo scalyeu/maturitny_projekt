@@ -1,29 +1,69 @@
 import os
+import re
+import shutil
 import time
 import json
 import uuid
+import secrets
 import threading
 import webbrowser
 import requests
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, date, timedelta
 
-from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
-from flask_sqlalchemy import SQLAlchemy
+from flask import (Flask, render_template, request, jsonify, redirect, url_for, session, flash, g,
+                   send_from_directory, abort)
 from stravalib.client import Client
 from dotenv import load_dotenv
+
+from models import (db, User, RaceResult, PlannedTraining, BiometricLog, TrainingLog,
+                    StravaToken, ChatMessage, UserProfile, VideoAnalysis, HurdleAnalysis,
+                    LEGACY_USER_TABLES)
+from auth import (login_required, roles_required, athlete_ids_visible_to,
+                  visible_athletes, row_visible, scope_query)
 
 load_dotenv()
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-key-for-sprint-predictor-123')
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+os.makedirs(app.instance_path, exist_ok=True)
+
+
+def _secret_key():
+    """
+    Tajný kľúč podpisuje session cookie (prihlásenie). Pevný reťazec v kóde by znamenal,
+    že si ktokoľvek s prístupom k repozitáru vie vyrobiť cookie admina – preto sa
+    kľúč berie z .env, alebo sa raz vygeneruje a uloží do instance/secret_key.
+    """
+    key = os.getenv('SECRET_KEY')
+    if key:
+        return key
+    path = os.path.join(app.instance_path, 'secret_key')
+    try:
+        with open(path, 'r', encoding='utf-8') as f:
+            key = f.read().strip()
+        if key:
+            return key
+    except OSError:
+        pass
+    key = secrets.token_hex(32)
+    with open(path, 'w', encoding='utf-8') as f:
+        f.write(key)
+    try:
+        os.chmod(path, 0o600)
+    except OSError:
+        pass
+    return key
+
+
+app.config['SECRET_KEY'] = _secret_key()
+# Cestu k DB možno prepísať (testy, dočasná inštancia); predvolene instance/database.db
+app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('ATLETCOACH_DB_URI', 'sqlite:///database.db')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Session sa vymaže keď zatvoríš prehliadač (nie permanent cookie)
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 
-db = SQLAlchemy(app)
+db.init_app(app)
 
 
 @app.before_request
@@ -32,132 +72,86 @@ def make_session_non_permanent():
 
 
 # -----------------------------
-# Database Models
-# -----------------------------
-class BiometricLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    hrv = db.Column(db.Float, nullable=False)
-    recovery = db.Column(db.Integer, nullable=True)
-    rhr = db.Column(db.Integer, nullable=True)
-
-
-class TrainingLog(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    date = db.Column(db.Date, nullable=False, default=datetime.utcnow)
-    training_type = db.Column(db.String(100), nullable=False)
-    distance_km = db.Column(db.Float, nullable=True)
-    duration_min = db.Column(db.Float, nullable=True)
-    duration_sec = db.Column(db.Float, nullable=True)
-    intervals_data = db.Column(db.Text, nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-
-
-class StravaToken(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    athlete_id = db.Column(db.String(64), nullable=True, index=True)
-    access_token = db.Column(db.Text, nullable=False)
-    refresh_token = db.Column(db.Text, nullable=True)
-    expires_at = db.Column(db.Integer, nullable=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-
-class ChatMessage(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    role = db.Column(db.String(20), nullable=False)
-    content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-
-class UserProfile(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=True)
-    age = db.Column(db.Integer, nullable=True)
-    sport = db.Column(db.String(100), nullable=True)
-    goal = db.Column(db.String(200), nullable=True)
-    height_cm = db.Column(db.Float, nullable=True)
-    updated_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-
-
-class VideoAnalysis(db.Model):
-    """Uložený výsledok analýzy techniky z videa."""
-    id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    original_name = db.Column(db.String(255), nullable=True)
-    stored_name = db.Column(db.String(255), nullable=True)
-    overlay_name = db.Column(db.String(255), nullable=True)
-    label = db.Column(db.String(120), nullable=True)
-
-    fps = db.Column(db.Float, nullable=True)
-    duration_s = db.Column(db.Float, nullable=True)
-    athlete_height_cm = db.Column(db.Float, nullable=True)
-
-    steps_detected = db.Column(db.Integer, nullable=True)
-    contact_ms_mean = db.Column(db.Float, nullable=True)
-    contact_ms_sd = db.Column(db.Float, nullable=True)
-    flight_ms_mean = db.Column(db.Float, nullable=True)
-    cadence_spm = db.Column(db.Float, nullable=True)
-    duty_factor_pct = db.Column(db.Float, nullable=True)
-    asymmetry_pct = db.Column(db.Float, nullable=True)
-    speed_ms = db.Column(db.Float, nullable=True)
-    stride_length_m = db.Column(db.Float, nullable=True)
-
-    result_json = db.Column(db.Text, nullable=True)
-
-
-class HurdleAnalysis(db.Model):
-    """Uložený výsledok analýzy prekážkového behu z videa."""
-    id = db.Column(db.Integer, primary_key=True)
-    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    original_name = db.Column(db.String(255), nullable=True)
-    stored_name = db.Column(db.String(255), nullable=True)
-    overlay_name = db.Column(db.String(255), nullable=True)
-    label = db.Column(db.String(120), nullable=True)
-    discipline = db.Column(db.String(20), nullable=True)
-
-    fps = db.Column(db.Float, nullable=True)
-    duration_s = db.Column(db.Float, nullable=True)
-    athlete_height_cm = db.Column(db.Float, nullable=True)
-
-    hurdles_detected = db.Column(db.Integer, nullable=True)
-    interval_mean_s = db.Column(db.Float, nullable=True)
-    interval_sd_s = db.Column(db.Float, nullable=True)
-    steps_pattern = db.Column(db.String(120), nullable=True)
-    flight_ms_mean = db.Column(db.Float, nullable=True)
-    landing_contact_ms_mean = db.Column(db.Float, nullable=True)
-    speed_between_ms_mean = db.Column(db.Float, nullable=True)
-
-    result_json = db.Column(db.Text, nullable=True)
-
-
-# -----------------------------
 # Init
+# Modely sú v models.py (importujú ich aj blueprinty). Tu ostáva migrácia
+# existujúcej databázy a prvotné vytvorenie admina.
 # -----------------------------
 def _ensure_columns():
     """
     Jednoduchá migrácia: db.create_all() vie vytvoriť novú tabuľku, ale
     nevie pridať stĺpec do už existujúcej.  Toto doplní chýbajúce stĺpce,
     takže existujúca database.db zostane funkčná aj po aktualizácii.
+
+    SQLite: pridávajú sa obyčajné NULL-ové stĺpce bez FK constraintu (ALTER TABLE
+    ho aj tak nevynúti, vzťah drží ORM). Každý ALTER beží zvlášť, aby jedna chyba
+    nenechala chýbať ostatné stĺpce. Ak po prejdení niečo stále chýba, appka radšej
+    nenaštartuje, než aby padala na každom dotaze s 'no such column'.
     """
     from sqlalchemy import text, inspect
     inspector = inspect(db.engine)
-    wanted = {'user_profile': [('height_cm', 'FLOAT')]}
+    wanted = {'user_profile': [('height_cm', 'FLOAT')],
+              'user': [('coach_confirmed', 'BOOLEAN NOT NULL DEFAULT 0')]}
+    for table in LEGACY_USER_TABLES:
+        wanted.setdefault(table, []).append(('user_id', 'INTEGER'))
+
+    tables = set(inspector.get_table_names())
     for table, cols in wanted.items():
-        if table not in inspector.get_table_names():
+        if table not in tables:
             continue
         existing = {c['name'] for c in inspector.get_columns(table)}
         for name, sql_type in cols:
-            if name not in existing:
-                db.session.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {sql_type}'))
+            if name in existing:
+                continue
+            try:
+                db.session.execute(text(f'ALTER TABLE "{table}" ADD COLUMN {name} {sql_type}'))
                 db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f'Upozornenie: nepodarilo sa pridať stĺpec {table}.{name}: {e}')
+            if name == 'user_id':
+                try:
+                    db.session.execute(text(
+                        f'CREATE INDEX IF NOT EXISTS ix_{table}_user_id ON "{table}" (user_id)'))
+                    db.session.commit()
+                except Exception:
+                    db.session.rollback()
+
+    # Kontrola: po migrácii musí každý žiadaný stĺpec existovať.
+    inspector = inspect(db.engine)
+    missing = []
+    for table, cols in wanted.items():
+        if table not in tables:
+            continue
+        existing = {c['name'] for c in inspector.get_columns(table)}
+        missing += [f'{table}.{name}' for name, _ in cols if name not in existing]
+    if missing:
+        raise RuntimeError('Migrácia databázy zlyhala, chýbajú stĺpce: ' + ', '.join(missing))
+
+
+def _seed_admin():
+    """Prvé spustenie: bez jediného účtu by sa nedalo prihlásiť – vytvorí sa admin/admin."""
+    if User.query.count() > 0:
+        return
+    admin = User(username='admin', role='admin', full_name='Administrátor',
+                 must_change_password=True)
+    admin.set_password('admin')
+    db.session.add(admin)
+    db.session.commit()
+    print('\n' + '=' * 64)
+    print('  PRVÉ SPUSTENIE: vytvorený účet administrátora')
+    print('  prihlasovacie meno: admin      heslo: admin')
+    print('  Po prihlásení si heslo hneď zmeň (appka to vyžiada).')
+    print('=' * 64 + '\n')
 
 
 with app.app_context():
     db.create_all()
+    _ensure_columns()
     try:
-        _ensure_columns()
+        _seed_admin()
     except Exception as _e:
-        print('Upozornenie: migrácia stĺpcov zlyhala:', _e)
+        db.session.rollback()
+        print('Upozornenie: nepodarilo sa vytvoriť predvoleného admina:', _e)
 
 
 # -----------------------------
@@ -168,7 +162,7 @@ STRAVA_CLIENT_SECRET = os.getenv('STRAVA_CLIENT_SECRET')
 STRAVA_REDIRECT_URI = (
     os.getenv('STRAVA_REDIRECT_URI')
     or os.getenv('STRAVA_CALLBACK_URL')
-    or 'http://localhost:5000/strava/callback'
+    or 'http://localhost:5001/strava/callback'
 )
 
 
@@ -443,9 +437,68 @@ def get_strava_prs(access_token):
 # -----------------------------
 # Routes
 # -----------------------------
+def _clear_strava_session():
+    """Odpojí Stravu, ale nechá používateľa prihláseného v appke (žiadne session.clear())."""
+    for key in [k for k in list(session.keys()) if k.startswith('strava_')]:
+        session.pop(key, None)
+    session.modified = True
+
+
+def _coach_dashboard():
+    """Prehľad pre trénera/admina: zverenci, plán na tento týždeň, splnenie, posledné výsledky."""
+    if g.user.is_admin:
+        athletes = User.query.filter_by(role='zverenec').order_by(User.username).all()
+    else:
+        athletes = User.query.filter_by(coach_id=g.user.id).order_by(User.username).all()
+    athlete_ids = [a.id for a in athletes]
+
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())
+    week_end = week_start + timedelta(days=6)
+
+    planned_week = 0
+    completion_pct = None
+    completed_count = due_count = 0
+    last_results = []
+    last_result_by_athlete = {}
+    if athlete_ids:
+        planned_week = PlannedTraining.query.filter(
+            PlannedTraining.athlete_id.in_(athlete_ids),
+            PlannedTraining.date >= week_start, PlannedTraining.date <= week_end).count()
+        # Splnenie sa počíta len z tréningov, ktorých termín už uplynul (posledných 28 dní).
+        due = PlannedTraining.query.filter(
+            PlannedTraining.athlete_id.in_(athlete_ids),
+            PlannedTraining.date >= today - timedelta(days=28),
+            PlannedTraining.date <= today).all()
+        due_count = len(due)
+        completed_count = sum(1 for p in due if p.completed)
+        if due_count:
+            completion_pct = round(100 * completed_count / due_count)
+        results = RaceResult.query.filter(RaceResult.user_id.in_(athlete_ids)) \
+            .order_by(RaceResult.date.desc(), RaceResult.id.desc()).all()
+        last_results = results[:5]
+        for r in results:
+            last_result_by_athlete.setdefault(r.user_id, r)
+
+    return render_template(
+        'trener/dashboard.html',
+        athletes=athletes, planned_week=planned_week,
+        week_start=week_start, week_end=week_end,
+        completion_pct=completion_pct, completed_count=completed_count, due_count=due_count,
+        last_results=last_results, last_result_by_athlete=last_result_by_athlete,
+    )
+
+
 @app.route('/')
 def index():
-    recent_logs = BiometricLog.query.order_by(BiometricLog.date.desc()).limit(14).all()
+    # Neprihlásený: úvodná stránka. Tréner/admin: prehľad zverencov. Zverenec: osobný dashboard.
+    if g.user is None:
+        return render_template('landing.html')
+    if g.user.is_coach or g.user.is_admin:
+        return _coach_dashboard()
+
+    recent_logs = BiometricLog.query.filter_by(user_id=g.user.id) \
+        .order_by(BiometricLog.date.desc()).limit(14).all()
 
     last_hrv = None
     avg_hrv_7 = None
@@ -463,7 +516,8 @@ def index():
             avg_hrv_7 = sum(hrvs) / len(hrvs)
 
     week_ago = date.today() - timedelta(days=6)
-    trainings_week = TrainingLog.query.filter(TrainingLog.date >= week_ago).all()
+    trainings_week = TrainingLog.query.filter(TrainingLog.user_id == g.user.id,
+                                              TrainingLog.date >= week_ago).all()
     weekly_km = sum((t.distance_km or 0.0) for t in trainings_week)
 
     return render_template(
@@ -474,12 +528,14 @@ def index():
         last_recovery=last_recovery,
         last_rhr=last_rhr,
         recent_logs=recent_logs[:5],
-        last_video=VideoAnalysis.query.order_by(VideoAnalysis.created_at.desc()).first(),
+        last_video=VideoAnalysis.query.filter_by(user_id=g.user.id)
+                                      .order_by(VideoAnalysis.created_at.desc()).first(),
         strava_logged_in=bool(session.get('strava_access_token'))
     )
 
 
 @app.route('/log', methods=['GET', 'POST'])
+@login_required
 def log_data():
     if request.method == 'POST':
         hrv = request.form.get('hrv', type=float)
@@ -488,6 +544,7 @@ def log_data():
 
         if hrv is not None:
             new_log = BiometricLog(
+                user_id=g.user.id,
                 hrv=hrv,
                 recovery=recovery,
                 rhr=rhr
@@ -498,11 +555,13 @@ def log_data():
 
         return redirect(url_for('log_data'))
 
-    logs = BiometricLog.query.order_by(BiometricLog.date.desc()).limit(5).all()
+    logs = BiometricLog.query.filter_by(user_id=g.user.id) \
+        .order_by(BiometricLog.date.desc()).limit(5).all()
     return render_template('log.html', logs=logs)
 
 
 @app.route('/import-whoop', methods=['POST'])
+@login_required
 def import_whoop():
     import io, csv as csv_mod, re as _re
 
@@ -605,11 +664,13 @@ def import_whoop():
                 total_skipped += 1
                 continue
 
-            if BiometricLog.query.filter_by(date=entry_date).first():
+            # Duplicita sa hľadá len v záznamoch tohto používateľa
+            if BiometricLog.query.filter_by(user_id=g.user.id, date=entry_date).first():
                 total_skipped += 1
                 continue
 
             db.session.add(BiometricLog(
+                user_id=g.user.id,
                 date=entry_date,
                 hrv=hrv_val,
                 recovery=int(rec_num) if rec_num is not None else None,
@@ -632,6 +693,7 @@ def import_whoop():
 
 
 @app.route('/trainings', methods=['GET', 'POST'])
+@login_required
 def trainings():
     if request.method == 'POST':
         t_type = request.form.get('training_type')
@@ -651,6 +713,7 @@ def trainings():
 
         if t_type:
             new_log = TrainingLog(
+                user_id=g.user.id,
                 training_type=t_type,
                 distance_km=dist,
                 duration_min=dur_min,
@@ -662,7 +725,8 @@ def trainings():
             db.session.commit()
             return redirect(url_for('trainings'))
 
-    all_trainings = TrainingLog.query.order_by(TrainingLog.date.desc()).all()
+    all_trainings = TrainingLog.query.filter_by(user_id=g.user.id) \
+        .order_by(TrainingLog.date.desc()).all()
 
     grouped_trainings = {}
     train_dates = {}
@@ -678,36 +742,49 @@ def trainings():
 
 
 @app.route('/ai')
+@login_required
 def ai_portal():
     return render_template('ai.html')
 
 
 @app.route('/strava/login')
+@login_required
 def strava_login():
     if session.get('strava_access_token'):
         return redirect(url_for('dashboard'))
 
     if not STRAVA_CLIENT_ID or not STRAVA_REDIRECT_URI:
-        return "Server not configured for Strava OAuth.", 500
+        # Bez kľúčov v .env nemá Strava kam presmerovať – nie je to chyba servera, len chýbajúca konfigurácia.
+        flash('Strava nie je nastavená: do súboru .env doplň STRAVA_CLIENT_ID a STRAVA_CLIENT_SECRET (pozri .env.example).', 'warning')
+        return redirect(request.referrer or url_for('index'))
 
     from urllib.parse import urlencode
 
+    # `state` sa v callbacku porovná so session – cudzí podstrčený kód sa tak neprepojí s týmto účtom
+    state = secrets.token_urlsafe(16)
+    session['strava_oauth_state'] = state
     params = {
         'client_id': STRAVA_CLIENT_ID,
         'response_type': 'code',
         'redirect_uri': STRAVA_REDIRECT_URI,
         'scope': 'read,activity:read_all',
-        'approval_prompt': 'force'
+        'approval_prompt': 'force',
+        'state': state,
     }
     auth_url = f"https://www.strava.com/oauth/authorize?{urlencode(params)}"
     return redirect(auth_url)
 
 
 @app.route('/strava/callback')
+@login_required
 def strava_authorized():
     code = request.args.get('code')
     if not code:
         return "Chyba: Nedostal som autorizačný kód.", 400
+    expected_state = session.pop('strava_oauth_state', None)
+    if not expected_state or request.args.get('state') != expected_state:
+        flash("Prepojenie so Stravou sa nepodarilo overiť. Skús to znova cez „Pripojiť Stravu“.", "danger")
+        return redirect(url_for('index'))
 
     try:
         client = Client()
@@ -740,6 +817,8 @@ def strava_authorized():
                 token_row.refresh_token = token_response['refresh_token']
                 token_row.expires_at = token_response['expires_at']
 
+            # Token patrí prihlásenému používateľovi appky
+            token_row.user_id = g.user.id
             db.session.commit()
 
         flash("Úspešne si sa prepojil so Stravou!", "success")
@@ -750,6 +829,7 @@ def strava_authorized():
 
 
 @app.route('/dashboard')
+@login_required
 def dashboard():
     athlete_id = session.get('strava_athlete_id')
     token = session.get('strava_access_token')
@@ -762,8 +842,9 @@ def dashboard():
         try:
             token = get_valid_access_token(athlete_id)
         except Exception:
-            session.clear()
-            flash("Platnosť prihlásenia vypršala. Prihlás sa znova.", "warning")
+            # Len Strava kľúče – vypršaný Strava token nesmie odhlásiť z appky
+            _clear_strava_session()
+            flash("Platnosť prepojenia so Stravou vypršala. Pripoj Stravu znova.", "warning")
             return redirect(url_for('index'))
 
     if not token:
@@ -810,6 +891,7 @@ def dashboard():
 
 
 @app.route('/osobaky')
+@login_required
 def osobaky():
     athlete_id = session.get('strava_athlete_id')
     token = session.get('strava_access_token')
@@ -818,8 +900,8 @@ def osobaky():
         try:
             token = get_valid_access_token(athlete_id)
         except Exception:
-            session.clear()
-            flash("Platnosť prihlásenia vypršala. Prihlás sa znova.", "warning")
+            _clear_strava_session()
+            flash("Platnosť prepojenia so Stravou vypršala. Pripoj Stravu znova.", "warning")
             return redirect(url_for('index'))
 
     if not token:
@@ -850,8 +932,10 @@ def osobaky():
     return render_template('osobaky.html', prs=prs, error=error)
 
 
-@app.route('/logout')
-def logout():
+@app.route('/strava/logout')
+@login_required
+def strava_logout():
+    """Odpojí Stravu od účtu (odhlásenie z appky je /odhlasenie v auth.py)."""
     access_token = session.get('strava_access_token')
     athlete_id = session.get('strava_athlete_id')
 
@@ -866,18 +950,21 @@ def logout():
         except Exception:
             pass
 
-    # Delete token from DB so it can't be silently refreshed
+    # Delete token from DB so it can't be silently refreshed – len vlastný (alebo starý bez vlastníka)
     if athlete_id:
-        StravaToken.query.filter_by(athlete_id=str(athlete_id)).delete()
+        StravaToken.query.filter(
+            StravaToken.athlete_id == str(athlete_id),
+            db.or_(StravaToken.user_id == g.user.id, StravaToken.user_id.is_(None)),
+        ).delete(synchronize_session=False)
         db.session.commit()
 
-    session.clear()
-    session.modified = True
-    flash("Bol si odhlásený.", "success")
+    _clear_strava_session()
+    flash("Strava bola odpojená.", "success")
     return redirect(url_for('index'))
 
 
 @app.route('/api/debug-prs')
+@roles_required('admin')
 def debug_prs():
     """Debug endpoint — ukáže čo Strava vracia pre best_efforts posledných 5 behov."""
     token = session.get('strava_access_token')
@@ -951,6 +1038,7 @@ def decode_polyline(encoded):
 
 
 @app.route('/heatmap')
+@login_required
 def heatmap():
     athlete_id = session.get('strava_athlete_id')
     token = session.get('strava_access_token')
@@ -961,6 +1049,7 @@ def heatmap():
 
 
 @app.route('/api/heatmap-data')
+@login_required
 def heatmap_data():
     athlete_id = session.get('strava_athlete_id')
     token = session.get('strava_access_token')
@@ -1016,17 +1105,19 @@ def heatmap_data():
 
 
 @app.route('/api/readiness')
+@login_required
 def readiness():
     today = date.today()
-    today_log = BiometricLog.query.filter_by(date=today).order_by(BiometricLog.id.desc()).first()
+    my_logs = BiometricLog.query.filter_by(user_id=g.user.id)
+    today_log = my_logs.filter_by(date=today).order_by(BiometricLog.id.desc()).first()
     if not today_log:
-        today_log = BiometricLog.query.order_by(BiometricLog.date.desc()).first()
+        today_log = my_logs.order_by(BiometricLog.date.desc()).first()
 
     if not today_log:
         return jsonify({'error': 'Žiadne dáta. Najprv si zaloguj HRV a recovery.'}), 404
 
     cutoff = today - timedelta(days=30)
-    logs_30 = BiometricLog.query.filter(BiometricLog.date >= cutoff).all()
+    logs_30 = my_logs.filter(BiometricLog.date >= cutoff).all()
     hrv_values = [l.hrv for l in logs_30 if l.hrv is not None]
     avg_hrv = sum(hrv_values) / len(hrv_values) if hrv_values else today_log.hrv
 
@@ -1161,6 +1252,7 @@ alebo sa metódy nezhodli: upozorni na presnosť.] Konkrétne by som sa zameral 
 
 
 @app.route('/api/chat', methods=['POST'])
+@login_required
 def chat():
     import re as _re, json as _json
     from pathlib import Path
@@ -1180,7 +1272,7 @@ def chat():
         today_d = date.today()
 
         # --- Profil atleta ---
-        profile = UserProfile.query.first()
+        profile = _profile_for(g.user.id)
         if profile and any([profile.name, profile.age, profile.sport, profile.goal]):
             athlete_context += "\n\n## PROFIL ATLETA\n"
             if profile.name:  athlete_context += f"Meno: {profile.name}\n"
@@ -1213,11 +1305,13 @@ def chat():
 
         # --- Biometrika (60 dní) ---
         logs_60 = BiometricLog.query.filter(
+            BiometricLog.user_id == g.user.id,
             BiometricLog.date >= today_d - timedelta(days=60)
         ).order_by(BiometricLog.date.desc()).all()
 
         # --- Tréningy (60 dní) ---
         train_logs = TrainingLog.query.filter(
+            TrainingLog.user_id == g.user.id,
             TrainingLog.date >= today_d - timedelta(days=60)
         ).order_by(TrainingLog.date.desc()).limit(20).all()
 
@@ -1269,7 +1363,8 @@ Posledných 7 dní:"""
                 athlete_context += f"\n  {t.date.strftime('%d.%m')} {t.training_type}:{dist}{dur}{intervals}{notes}"
 
         # --- Analýza techniky z videa (posledné 3 merania) ---
-        vids = VideoAnalysis.query.order_by(VideoAnalysis.created_at.desc()).limit(3).all()
+        vids = VideoAnalysis.query.filter_by(user_id=g.user.id) \
+            .order_by(VideoAnalysis.created_at.desc()).limit(3).all()
         if vids:
             athlete_context += "\n### Analýza techniky z videa\n"
             for v in vids:
@@ -1310,7 +1405,8 @@ Posledných 7 dní:"""
                 "Asymetria nad 5 % môže naznačovať svalovú nerovnováhu.\n")
 
         # --- Prekážky (posledné 3 merania) ---
-        hur = HurdleAnalysis.query.order_by(HurdleAnalysis.created_at.desc()).limit(3).all()
+        hur = HurdleAnalysis.query.filter_by(user_id=g.user.id) \
+            .order_by(HurdleAnalysis.created_at.desc()).limit(3).all()
         if hur:
             athlete_context += "\n### Analýza prekážok z videa\n"
             for h in hur:
@@ -1334,7 +1430,8 @@ Posledných 7 dní:"""
         pass
 
     # --- História z DB (posledných 20 správ) ---
-    db_history = ChatMessage.query.order_by(ChatMessage.created_at.desc()).limit(20).all()
+    db_history = ChatMessage.query.filter_by(user_id=g.user.id) \
+        .order_by(ChatMessage.created_at.desc()).limit(20).all()
     db_history = [{'role': m.role, 'content': m.content} for m in reversed(db_history)]
 
     MODELS = [
@@ -1369,8 +1466,8 @@ Posledných 7 dní:"""
                 reply = resp.json()['choices'][0]['message']['content']
                 reply = _re.sub(r'<think>.*?</think>', '', reply, flags=_re.DOTALL).strip()
                 # Ulož do DB
-                db.session.add(ChatMessage(role='user', content=message))
-                db.session.add(ChatMessage(role='assistant', content=reply))
+                db.session.add(ChatMessage(user_id=g.user.id, role='user', content=message))
+                db.session.add(ChatMessage(user_id=g.user.id, role='assistant', content=reply))
                 db.session.commit()
                 return jsonify({'reply': reply, 'model': model_name})
             last_error = f"HTTP {resp.status_code}"
@@ -1381,34 +1478,48 @@ Posledných 7 dní:"""
     return jsonify({'error': f'Chyba: {last_error}'}), 500
 
 
+def _profile_for(user_id, create=False):
+    """Profil daného používateľa (každý má najviac jeden); create=True ho založí."""
+    if user_id is None:
+        return None
+    p = UserProfile.query.filter_by(user_id=user_id).first()
+    if p is None and create:
+        p = UserProfile(user_id=user_id)
+        db.session.add(p)
+    return p
+
+
 @app.route('/api/chat/history')
+@login_required
 def chat_history():
-    msgs = ChatMessage.query.order_by(ChatMessage.created_at.asc()).all()
+    msgs = ChatMessage.query.filter_by(user_id=g.user.id).order_by(ChatMessage.created_at.asc()).all()
     return jsonify([{'role': m.role, 'content': m.content} for m in msgs])
 
 
 @app.route('/api/chat/clear', methods=['POST'])
+@login_required
 def chat_clear():
-    ChatMessage.query.delete()
+    ChatMessage.query.filter_by(user_id=g.user.id).delete(synchronize_session=False)
     db.session.commit()
     return jsonify({'ok': True})
 
 
 @app.route('/profile/api')
+@login_required
 def profile_api():
-    p = UserProfile.query.first()
+    p = _profile_for(g.user.id)
     if not p:
         return jsonify({})
     return jsonify({'name': p.name, 'age': p.age, 'sport': p.sport, 'goal': p.goal})
 
 
 @app.route('/profile', methods=['GET', 'POST'])
+@login_required
 def profile():
-    p = UserProfile.query.first()
+    p = _profile_for(g.user.id)
     if request.method == 'POST':
         if not p:
-            p = UserProfile()
-            db.session.add(p)
+            p = _profile_for(g.user.id, create=True)
         p.name = request.form.get('name', '').strip() or None
         age_raw = request.form.get('age', '').strip()
         p.age = int(age_raw) if age_raw.isdigit() else None
@@ -1430,8 +1541,20 @@ def profile():
 # ANALÝZA VIDEA – kontakt so zemou, technika, prekážky
 # ===========================================================================
 
-VIDEO_DIR = os.path.join(app.root_path, 'static', 'uploads', 'videos')
+# Videá nesmú ležať v static/ – tam ich Flask podá komukoľvek, kto pozná URL.
+# Ležia v instance/videos a podáva ich chránená routa /media/<súbor> (kontrola vlastníka).
+VIDEO_DIR = os.path.join(app.instance_path, 'videos')
 os.makedirs(VIDEO_DIR, exist_ok=True)
+_LEGACY_VIDEO_DIR = os.path.join(app.root_path, 'static', 'uploads', 'videos')
+if os.path.isdir(_LEGACY_VIDEO_DIR):
+    # Staršia verzia ukladala videá do static/ – presunieme ich, aby staré analýzy ďalej fungovali.
+    for _f in os.listdir(_LEGACY_VIDEO_DIR):
+        _src = os.path.join(_LEGACY_VIDEO_DIR, _f)
+        if os.path.isfile(_src) and not os.path.exists(os.path.join(VIDEO_DIR, _f)):
+            try:
+                shutil.move(_src, os.path.join(VIDEO_DIR, _f))
+            except OSError:
+                pass
 
 ALLOWED_VIDEO_EXT = {'.mp4', '.mov', '.m4v', '.avi', '.mkv', '.webm'}
 app.config['MAX_CONTENT_LENGTH'] = 600 * 1024 * 1024   # 600 MB
@@ -1459,7 +1582,37 @@ def _job_get(job_id):
 
 def _video_url(name):
     # Bez url_for – volá sa aj z vlákna analýzy, kde nie je aktívny request.
-    return f"{app.static_url_path}/uploads/videos/{name}" if name else None
+    return f"/media/{name}" if name else None
+
+
+def _media_owner_row(name):
+    """
+    Nájde analýzu, ku ktorej súbor patrí. Všetky súbory jednej analýzy zdieľajú
+    prefix job_id: <id>.mp4 (originál), <id>_overlay.mp4, <id>_kf01.jpg (snímky).
+    """
+    key = name.split('_')[0].split('.')[0]
+    if not re.fullmatch(r'[0-9a-f]{32}', key or ''):
+        return None
+    for model in (VideoAnalysis, HurdleAnalysis):
+        row = model.query.filter(model.stored_name.like(f'{key}.%')).first()
+        if row is not None:
+            return row
+    return None
+
+
+@app.route('/media/<path:name>')
+@login_required
+def media_file(name):
+    """Video, prekryv aj snímky vidí len ten, kto smie vidieť samotnú analýzu."""
+    safe = os.path.basename(name)
+    if safe != name or not safe:
+        abort(404)
+    row = _media_owner_row(safe)
+    if row is None:
+        abort(404)
+    if not row_visible(row.user_id):
+        abort(403)
+    return send_from_directory(VIDEO_DIR, safe, conditional=True)
 
 
 def _attach_urls(result):
@@ -1516,14 +1669,66 @@ def _save_upload():
     return (job_id, path, stored_name, file.filename), None
 
 
-def _remember_height(height_cm):
-    if height_cm:
-        p = UserProfile.query.first()
-        if not p:
-            p = UserProfile()
-            db.session.add(p)
+def _remember_height(height_cm, user_id):
+    """Zapamätá výšku v profile atléta, ktorého video sa analyzuje (nie nutne prihláseného)."""
+    if height_cm and user_id:
+        p = _profile_for(user_id, create=True)
         p.height_cm = height_cm
         db.session.commit()
+
+
+def _target_athlete_id():
+    """
+    Komu analýza patrí: `athlete_id` z formulára (tréner vyberá zverenca), inak prihlásený.
+    Vráti (id, None) alebo (None, JSON chyba) – cudzí zverenec sa odmietne, nie potichu nahradí.
+    """
+    raw = (request.form.get('athlete_id') or '').strip()
+    if not raw:
+        return g.user.id, None
+    try:
+        athlete_id = int(raw)
+    except ValueError:
+        return None, (jsonify({'error': 'Neplatný zverenec.'}), 400)
+    if athlete_id not in athlete_ids_visible_to(g.user):
+        return None, (jsonify({'error': 'Na tohto zverenca nemáš oprávnenie.'}), 403)
+    if db.session.get(User, athlete_id) is None:
+        return None, (jsonify({'error': 'Zverenec neexistuje.'}), 404)
+    return athlete_id, None
+
+
+def _visible_analysis(model, analysis_id):
+    """Načíta analýzu; (row, None) alebo (None, JSON chyba) ak neexistuje / nie je viditeľná."""
+    row = db.session.get(model, analysis_id)
+    if not row:
+        return None, (jsonify({'error': 'Analýza neexistuje.'}), 404)
+    if not row_visible(row.user_id):
+        return None, (jsonify({'error': 'Na túto analýzu nemáš oprávnenie.'}), 403)
+    return row, None
+
+
+def _analysis_page_context():
+    """Spoločné údaje pre stránky Video a Prekážky: výška z profilu, výber zverenca pre trénera."""
+    profile = _profile_for(g.user.id)
+    ctx = {
+        'default_height': (profile.height_cm if profile and profile.height_cm else ''),
+        'athletes': None, 'athlete_heights': {}, 'owner_names': {},
+        'groq_ok': bool(os.getenv('GROQ_API_KEY', '')) and not os.getenv('GROQ_API_KEY', '').startswith('gsk_...'),
+    }
+    if g.user.is_coach or g.user.is_admin:
+        athletes = visible_athletes(g.user)
+        ctx['athletes'] = athletes
+        # Kľúče ako text – v šablóne ich číta JS podľa hodnoty <select>
+        ctx['athlete_heights'] = {
+            str(p.user_id): p.height_cm
+            for p in UserProfile.query.filter(UserProfile.user_id.in_([a.id for a in athletes])).all()
+            if p.height_cm
+        }
+        # Mená vlastníkov k položkám histórie (admin vidí aj analýzy ľudí mimo výberu)
+        if g.user.is_admin:
+            ctx['owner_names'] = {u.id: u.username for u in User.query.all()}
+        else:
+            ctx['owner_names'] = {a.id: a.username for a in athletes}
+    return ctx
 
 
 def _run_video_job(job_id, video_path, stored_name, original_name, opts):
@@ -1559,6 +1764,7 @@ def _run_video_job(job_id, video_path, stored_name, original_name, opts):
         s = result['summary']
         with app.app_context():
             row = VideoAnalysis(
+                user_id=opts.get('athlete_id'),
                 original_name=original_name,
                 stored_name=stored_name,
                 overlay_name=overlay_name,
@@ -1613,33 +1819,35 @@ def _cleanup_failed(video_path, overlay_path):
 
 
 @app.route('/video')
+@login_required
 def video_page():
     import video_analysis as va
     ok, dep_msg = va.dependencies_ok()
-    profile = UserProfile.query.first()
-    history = VideoAnalysis.query.order_by(VideoAnalysis.created_at.desc()).limit(25).all()
-    return render_template(
-        'video.html',
-        deps_ok=ok, deps_msg=dep_msg,
-        default_height=(profile.height_cm if profile and profile.height_cm else ''),
-        history=history,
-        groq_ok=bool(os.getenv('GROQ_API_KEY', '')) and not os.getenv('GROQ_API_KEY', '').startswith('gsk_...'),
-    )
+    history = scope_query(VideoAnalysis.query, VideoAnalysis) \
+        .order_by(VideoAnalysis.created_at.desc()).limit(25).all()
+    return render_template('video.html', deps_ok=ok, deps_msg=dep_msg, history=history,
+                           **_analysis_page_context())
 
 
 @app.route('/api/video/analyze', methods=['POST'])
+@login_required
 def video_analyze():
     import video_analysis as va
     ok, dep_msg = va.dependencies_ok()
     if not ok:
         return jsonify({'error': dep_msg}), 500
 
+    # Vlastník analýzy sa overí ešte pred uložením súboru na disk
+    athlete_id, err = _target_athlete_id()
+    if err:
+        return err
     saved, err = _save_upload()
     if err:
         return err
     job_id, path, stored_name, original_name = saved
     opts = _parse_upload_form()
-    _remember_height(opts['height_cm'])
+    opts['athlete_id'] = athlete_id
+    _remember_height(opts['height_cm'], athlete_id)
 
     try:
         info = va.probe_video(path)
@@ -1648,7 +1856,7 @@ def video_analyze():
         return jsonify({'error': str(e)}), 400
 
     _job_set(job_id, state='queued', progress=0, message='Čakám na spracovanie',
-             video_info=info)
+             video_info=info, user_id=athlete_id)
     threading.Thread(
         target=_run_video_job,
         args=(job_id, path, stored_name, original_name, opts),
@@ -1659,18 +1867,22 @@ def video_analyze():
 
 
 @app.route('/api/video/job/<job_id>')
+@login_required
 def video_job(job_id):
     job = _job_get(job_id)
     if not job:
         return jsonify({'error': 'Úloha neexistuje (server bol pravdepodobne reštartovaný).'}), 404
+    if not row_visible(job.get('user_id')):
+        return jsonify({'error': 'Na túto úlohu nemáš oprávnenie.'}), 403
     return jsonify(job)
 
 
 @app.route('/api/video/result/<int:analysis_id>')
+@login_required
 def video_result(analysis_id):
-    row = db.session.get(VideoAnalysis, analysis_id)
-    if not row:
-        return jsonify({'error': 'Analýza neexistuje.'}), 404
+    row, err = _visible_analysis(VideoAnalysis, analysis_id)
+    if err:
+        return err
     data = json.loads(row.result_json or '{}')
     _attach_urls(data)
     data['overlay_url'] = _video_url(row.overlay_name)
@@ -1681,10 +1893,11 @@ def video_result(analysis_id):
 
 
 @app.route('/api/video/delete/<int:analysis_id>', methods=['POST'])
+@login_required
 def video_delete(analysis_id):
-    row = db.session.get(VideoAnalysis, analysis_id)
-    if not row:
-        return jsonify({'error': 'Analýza neexistuje.'}), 404
+    row, err = _visible_analysis(VideoAnalysis, analysis_id)
+    if err:
+        return err
     _delete_media(row)
     db.session.delete(row)
     db.session.commit()
@@ -1742,6 +1955,7 @@ def _run_hurdle_job(job_id, video_path, stored_name, original_name, opts):
         s = result['summary']
         with app.app_context():
             row = HurdleAnalysis(
+                user_id=opts.get('athlete_id'),
                 original_name=original_name,
                 stored_name=stored_name,
                 overlay_name=overlay_name,
@@ -1776,38 +1990,40 @@ def _run_hurdle_job(job_id, video_path, stored_name, original_name, opts):
 
 
 @app.route('/prekazky')
+@login_required
 def hurdles_page():
     import video_analysis as va
     ok, dep_msg = va.dependencies_ok()
-    profile = UserProfile.query.first()
-    history = HurdleAnalysis.query.order_by(HurdleAnalysis.created_at.desc()).limit(25).all()
-    return render_template(
-        'prekazky.html',
-        deps_ok=ok, deps_msg=dep_msg,
-        default_height=(profile.height_cm if profile and profile.height_cm else ''),
-        history=history,
-        groq_ok=bool(os.getenv('GROQ_API_KEY', '')) and not os.getenv('GROQ_API_KEY', '').startswith('gsk_...'),
-    )
+    history = scope_query(HurdleAnalysis.query, HurdleAnalysis) \
+        .order_by(HurdleAnalysis.created_at.desc()).limit(25).all()
+    return render_template('prekazky.html', deps_ok=ok, deps_msg=dep_msg, history=history,
+                           **_analysis_page_context())
 
 
 @app.route('/api/hurdles/analyze', methods=['POST'])
+@login_required
 def hurdles_analyze():
     import video_analysis as va
     ok, dep_msg = va.dependencies_ok()
     if not ok:
         return jsonify({'error': dep_msg}), 500
+    athlete_id, err = _target_athlete_id()
+    if err:
+        return err
     saved, err = _save_upload()
     if err:
         return err
     job_id, path, stored_name, original_name = saved
     opts = _parse_upload_form()
-    _remember_height(opts['height_cm'])
+    opts['athlete_id'] = athlete_id
+    _remember_height(opts['height_cm'], athlete_id)
     try:
         info = va.probe_video(path)
     except va.VideoAnalysisError as e:
         os.remove(path)
         return jsonify({'error': str(e)}), 400
-    _job_set(job_id, state='queued', progress=0, message='Čakám na spracovanie', video_info=info)
+    _job_set(job_id, state='queued', progress=0, message='Čakám na spracovanie',
+             video_info=info, user_id=athlete_id)
     threading.Thread(target=_run_hurdle_job,
                      args=(job_id, path, stored_name, original_name, opts),
                      daemon=True).start()
@@ -1815,10 +2031,11 @@ def hurdles_analyze():
 
 
 @app.route('/api/hurdles/result/<int:analysis_id>')
+@login_required
 def hurdles_result(analysis_id):
-    row = db.session.get(HurdleAnalysis, analysis_id)
-    if not row:
-        return jsonify({'error': 'Analýza neexistuje.'}), 404
+    row, err = _visible_analysis(HurdleAnalysis, analysis_id)
+    if err:
+        return err
     data = json.loads(row.result_json or '{}')
     _attach_urls(data)
     data['overlay_url'] = _video_url(row.overlay_name)
@@ -1829,10 +2046,11 @@ def hurdles_result(analysis_id):
 
 
 @app.route('/api/hurdles/delete/<int:analysis_id>', methods=['POST'])
+@login_required
 def hurdles_delete(analysis_id):
-    row = db.session.get(HurdleAnalysis, analysis_id)
-    if not row:
-        return jsonify({'error': 'Analýza neexistuje.'}), 404
+    row, err = _visible_analysis(HurdleAnalysis, analysis_id)
+    if err:
+        return err
     _delete_media(row)
     db.session.delete(row)
     db.session.commit()
@@ -1944,16 +2162,18 @@ def _coach_context(kind, data):
 
 
 @app.route('/api/coach/<kind>/<int:analysis_id>', methods=['POST'])
+@login_required
 def coach_comment(kind, analysis_id):
     model = VideoAnalysis if kind == 'sprint' else HurdleAnalysis if kind == 'hurdles' else None
     if model is None:
         return jsonify({'error': 'Neznámy typ analýzy.'}), 400
-    row = db.session.get(model, analysis_id)
-    if not row:
-        return jsonify({'error': 'Analýza neexistuje.'}), 404
+    row, err = _visible_analysis(model, analysis_id)
+    if err:
+        return err
     data = json.loads(row.result_json or '{}')
 
-    profile = UserProfile.query.first()
+    # Profil patrí atlétovi z videa (tréner môže žiadať komentár k zverencovi), nie prihlásenému
+    profile = _profile_for(row.user_id)
     prof = ''
     if profile:
         bits = []
@@ -1984,11 +2204,28 @@ def coach_comment(kind, analysis_id):
     return jsonify({'reply': reply, 'model': model_name})
 
 
+# ===========================================================================
+# BLUEPRINTY – registrujú sa až keď `app` existuje. Moduly importujú len
+# models/auth, nikdy app.py (kruhový import).
+# ===========================================================================
+from auth import bp as auth_bp  # noqa: E402
+app.register_blueprint(auth_bp)
+
+import trener, zverenec, planovanie, grafy, stopky, admin_panel, world_athletics  # noqa: E402,E401
+for _module in (trener, zverenec, planovanie, grafy, stopky, admin_panel, world_athletics):
+    app.register_blueprint(_module.bp)
+
+
 if __name__ == '__main__':
+    port = int(os.getenv('ATLETCOACH_PORT', '5001'))
+    # Reloader a debug sa dajú vypnúť (ATLETCOACH_RELOAD=0, FLASK_DEBUG=0) – skripty, nasadenie
+    use_reloader = os.getenv('ATLETCOACH_RELOAD', '1') == '1'
+    debug = os.getenv('FLASK_DEBUG', '1') == '1'
     # Otvor prehliadač iba raz (v child procese reloadera, nie v parent procese)
-    if os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+    if (os.environ.get('WERKZEUG_RUN_MAIN') == 'true' or not use_reloader) \
+            and os.getenv('ATLETCOACH_NO_BROWSER') != '1':
         def _open_browser():
             time.sleep(1.5)
-            webbrowser.open('http://127.0.0.1:5001')
+            webbrowser.open(f'http://127.0.0.1:{port}')
         threading.Thread(target=_open_browser, daemon=True).start()
-    app.run(debug=True, port=5001)
+    app.run(debug=debug, port=port, use_reloader=use_reloader)

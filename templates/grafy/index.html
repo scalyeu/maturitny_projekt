@@ -1,12 +1,385 @@
 {% extends "base.html" %}
-{% block title %}{{ title }} · AtletCoach{% endblock %}
+{% block title %}Grafy · AtletCoach{% endblock %}
 
 {% block content %}
 <main class="mt-10 pb-12">
-    <div class="mb-8">
-        <p class="eyebrow mb-2">{{ eyebrow }}</p>
-        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+
+    {# ── Hlavička + výber zverenca / disciplíny ──
+       Výber je GET formulár: stránka sa načíta znova s ?athlete_id=&discipline=,
+       takže funguje aj bez JavaScriptu; onchange ho len odošle sám. #}
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">{{ eyebrow }}{% if athlete.id != current_user.id %} · {{ athlete.display_name }}{% else %} · moje údaje{% endif %}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+        </div>
+
+        <form method="get" action="{{ url_for('grafy.index') }}" class="flex flex-wrap items-end gap-3">
+            {% if athletes and athletes|length > 1 %}
+            <div class="min-w-[200px]">
+                <label for="athlete_id">Zverenec</label>
+                <select id="athlete_id" name="athlete_id" onchange="this.form.submit()">
+                    {% for a in athletes %}
+                    <option value="{{ a.id }}" {% if a.id == athlete.id %}selected{% endif %}>
+                        {{ a.username }}{% if a.id == current_user.id %} (ja){% elif a.full_name %} – {{ a.full_name }}{% endif %}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% elif athlete.id != current_user.id %}
+            <input type="hidden" name="athlete_id" value="{{ athlete.id }}">
+            {% endif %}
+
+            {% if disciplines %}
+            <div class="min-w-[150px]">
+                <label for="discipline">Disciplína</label>
+                <select id="discipline" name="discipline" onchange="this.form.submit()">
+                    {% for d in disciplines %}
+                    <option value="{{ d }}" {% if d == discipline %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+            <noscript>
+                <button type="submit"
+                        class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Zobraziť</button>
+            </noscript>
+        </form>
     </div>
-    <p class="eyebrow">Pripravuje sa</p>
+
+    {% set res = data.vysledky %}
+    {% set pb = data.rekordy %}
+    {% set vol = data.objem %}
+    {% set plan = data.plan %}
+    {% set tech = data.technika %}
+
+    {# ════════ 1. Vývoj výsledkov podľa disciplíny ════════ #}
+    <section class="py-10 border-t border-white/10">
+        <div class="rule">
+            <p class="eyebrow">01 · Vývoj výsledkov{% if discipline %} · {{ discipline }}{% endif %}</p>
+        </div>
+
+        {% if res["values"] %}
+        <div class="flex items-baseline justify-between flex-wrap gap-3 mb-5">
+            <div>
+                <h2 class="font-headline font-bold text-xl text-on-surface">Výsledky z pretekov</h2>
+                <p class="eyebrow mt-1">nižší čas = vyššie · os je obrátená, zlepšenie stúpa</p>
+            </div>
+            <p class="mono text-[11px] text-on-surface-variant">{{ res["values"]|length }} pretekov · jedna séria</p>
+        </div>
+
+        <div class="grid grid-cols-3 gap-px bg-white/10 border border-white/10 mb-5">
+            <div class="bg-surface-container px-5 py-6">
+                <p class="eyebrow mb-3">Osobný rekord</p>
+                <p class="font-headline font-extrabold text-[34px] leading-none" style="color:var(--volt)">{{ res.meta.pb_text }}</p>
+                <p class="mono text-[11px] text-on-surface-variant mt-2">{{ res.meta.rows[res.meta.pb_index].date }}</p>
+            </div>
+            <div class="bg-surface-container px-5 py-6">
+                <p class="eyebrow mb-3">Posledný výsledok</p>
+                <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ res.meta.rows[-1].time }}</p>
+                <p class="mono text-[11px] text-on-surface-variant mt-2">{{ res.meta.rows[-1].date }}</p>
+            </div>
+            <div class="bg-surface-container px-5 py-6">
+                <p class="eyebrow mb-3">Prvý výsledok</p>
+                <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ res.meta.rows[0].time }}</p>
+                <p class="mono text-[11px] text-on-surface-variant mt-2">{{ res.meta.rows[0].date }}</p>
+            </div>
+        </div>
+
+        <div class="bg-surface-container border border-white/10 p-5">
+            <canvas id="chart-results" height="90"></canvas>
+        </div>
+
+        <details class="mt-4">
+            <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">Zobraziť ako tabuľku</summary>
+            <div class="overflow-x-auto mt-4 border border-white/10">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10 bg-surface-container">
+                            <th class="px-4 py-3 text-left">Dátum</th>
+                            <th class="px-4 py-3 text-right">Čas</th>
+                            <th class="px-4 py-3 text-left">Preteky</th>
+                            <th class="px-4 py-3 text-right">Umiestnenie</th>
+                            <th class="px-4 py-3 text-right">Vietor</th>
+                            <th class="px-4 py-3 text-left">Zdroj</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono text-[13px]">
+                        {% for r in res.meta.rows %}
+                        <tr class="border-b border-white/5">
+                            <td class="px-4 py-2 text-on-surface-variant">{{ r.date }}</td>
+                            <td class="px-4 py-2 text-right {{ 'font-semibold' if r.is_pb else 'text-on-surface' }}" {% if r.is_pb %}style="color:var(--volt)"{% endif %}>{{ r.time }}{% if r.is_pb %} <span class="eyebrow">PB</span>{% endif %}</td>
+                            <td class="px-4 py-2 text-on-surface">{{ r.competition or '—' }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{{ r.place or '—' }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{% if r.wind is not none %}{{ '%+.1f'|format(r.wind) }}{% else %}—{% endif %}</td>
+                            <td class="px-4 py-2 text-on-surface-variant">{{ r.source }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% else %}
+        <div class="border border-white/10 py-16 text-center">
+            <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+            <p class="text-on-surface mb-1">Žiadne výsledky z pretekov.</p>
+            <p class="text-sm text-on-surface-variant">
+                {% if athlete.id == current_user.id and current_user.is_athlete %}Výsledky zapisuje tréner v detaile zverenca; objavia sa tu aj časy uložené zo stopiek.
+                {% else %}Pridaj výsledky v detaile zverenca alebo ich načítaj z World Athletics.{% endif %}
+            </p>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ════════ 2. Osobné rekordy ════════ #}
+    <section class="py-10 border-t border-white/10">
+        <div class="rule"><p class="eyebrow">02 · Osobné rekordy</p></div>
+
+        {% if pb.meta.pbs %}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-14 gap-y-8">
+            {# Stĺpcový graf PB naprieč disciplínami by porovnával 100 m so 1500 m na jednej osi –
+               nič by to nepovedalo. Preto tabuľka; graf je len pre vybranú disciplínu. #}
+            <div>
+                <h2 class="font-headline font-bold text-xl text-on-surface mb-4">PB podľa disciplíny</h2>
+                <table class="w-full">
+                    <thead>
+                        <tr class="border-b border-white/10">
+                            <th class="py-2.5 text-left">Disciplína</th>
+                            <th class="py-2.5 text-right">Rekord</th>
+                            <th class="py-2.5 text-left pl-6">Dátum</th>
+                            <th class="py-2.5 text-right">Pretekov</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono text-[13px]">
+                        {% for p in pb.meta.pbs %}
+                        <tr class="border-b border-white/5 {{ 'bg-surface-container' if p.discipline == discipline else '' }}">
+                            <td class="py-3">
+                                <a href="{{ url_for('grafy.index', athlete_id=(athlete.id if athlete.id != current_user.id else none), discipline=p.discipline) }}"
+                                   class="text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ p.discipline }}</a>
+                            </td>
+                            <td class="py-3 text-right font-semibold" style="color:var(--volt)">{{ p.time }}</td>
+                            <td class="py-3 pl-6 text-on-surface-variant">{{ p.date }}{% if p.competition %} <span class="text-on-surface-variant/60">· {{ p.competition }}</span>{% endif %}</td>
+                            <td class="py-3 text-right text-on-surface-variant">{{ p.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div>
+                <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
+                    <h2 class="font-headline font-bold text-xl text-on-surface">Posun PB · {{ discipline }}</h2>
+                    <p class="eyebrow">bežiace minimum · nižší čas = vyššie</p>
+                </div>
+                <div class="bg-surface-container border border-white/10 p-5">
+                    <canvas id="chart-pb" height="110"></canvas>
+                </div>
+                <details class="mt-4">
+                    <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">Zobraziť ako tabuľku</summary>
+                    <div class="overflow-x-auto mt-4 border border-white/10">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-white/10 bg-surface-container">
+                                    <th class="px-4 py-3 text-left">Dátum</th>
+                                    <th class="px-4 py-3 text-right">Výsledok</th>
+                                    <th class="px-4 py-3 text-right">PB k dátumu</th>
+                                </tr>
+                            </thead>
+                            <tbody class="mono text-[13px]">
+                                {% for r in pb.meta.rows %}
+                                <tr class="border-b border-white/5">
+                                    <td class="px-4 py-2 text-on-surface-variant">{{ r.date }}</td>
+                                    <td class="px-4 py-2 text-right text-on-surface">{{ r.result }}</td>
+                                    <td class="px-4 py-2 text-right {{ 'text-on-surface' if r.improved else 'text-on-surface-variant' }}">{{ r.pb }}{% if r.improved %} <span class="eyebrow">▲</span>{% endif %}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </details>
+            </div>
+        </div>
+        {% else %}
+        <div class="border border-white/10 py-16 text-center">
+            <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+            <p class="text-on-surface">Osobný rekord vznikne z prvého zapísaného výsledku.</p>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ════════ 3. Tréningový objem ════════ #}
+    <section class="py-10 border-t border-white/10">
+        <div class="rule"><p class="eyebrow">03 · Tréningový objem · posledných {{ vol["values"]|length }} týždňov</p></div>
+
+        {% if vol.meta.total_km > 0 %}
+        <div class="flex items-baseline justify-between flex-wrap gap-3 mb-5">
+            <h2 class="font-headline font-bold text-xl text-on-surface">Kilometre za týždeň</h2>
+            <p class="mono text-[11px] text-on-surface-variant">spolu {{ vol.meta.total_km }} km · z denníka tréningov</p>
+        </div>
+        <div class="bg-surface-container border border-white/10 p-5">
+            <canvas id="chart-volume" height="90"></canvas>
+        </div>
+        <details class="mt-4">
+            <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">Zobraziť ako tabuľku</summary>
+            <div class="overflow-x-auto mt-4 border border-white/10">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10 bg-surface-container">
+                            <th class="px-4 py-3 text-left">Týždeň</th>
+                            <th class="px-4 py-3 text-left">Od – do</th>
+                            <th class="px-4 py-3 text-right">Tréningov</th>
+                            <th class="px-4 py-3 text-right">km</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono text-[13px]">
+                        {% for w in vol.meta.rows %}
+                        <tr class="border-b border-white/5">
+                            <td class="px-4 py-2 text-on-surface-variant">{{ w.week }}</td>
+                            <td class="px-4 py-2 text-on-surface-variant">{{ w.from }} – {{ w.to }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{{ w.sessions }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface">{{ w.km }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% else %}
+        <div class="border border-white/10 py-16 text-center">
+            <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+            <p class="text-on-surface mb-1">Za posledných {{ vol["values"]|length }} týždňov nie sú v denníku žiadne kilometre.</p>
+            {% if athlete.id == current_user.id %}
+            <a href="{{ url_for('trainings') }}"
+               class="inline-block mt-5 bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em]">Zapísať tréning</a>
+            {% else %}
+            <p class="text-sm text-on-surface-variant">Kilometre si zapisuje zverenec v sekcii Tréningy.</p>
+            {% endif %}
+        </div>
+        {% endif %}
+    </section>
+
+    {# ════════ 4. Plnenie plánu ════════ #}
+    <section class="py-10 border-t border-white/10">
+        <div class="rule"><p class="eyebrow">04 · Plnenie plánu · posledných {{ plan["values"]|length }} týždňov</p></div>
+
+        {% if plan.meta.total_planned > 0 %}
+        <div class="flex items-baseline justify-between flex-wrap gap-3 mb-5">
+            <h2 class="font-headline font-bold text-xl text-on-surface">Naplánované vs. splnené</h2>
+            <p class="mono text-[11px] text-on-surface-variant">
+                {{ plan.meta.total_completed }} z {{ plan.meta.total_planned }} tréningov
+                {% if plan.meta.pct is not none %}· <span class="text-on-surface">{{ plan.meta.pct }} %</span>{% endif %}
+            </p>
+        </div>
+        <div class="bg-surface-container border border-white/10 p-5">
+            <canvas id="chart-plan" height="90"></canvas>
+        </div>
+        <details class="mt-4">
+            <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">Zobraziť ako tabuľku</summary>
+            <div class="overflow-x-auto mt-4 border border-white/10">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10 bg-surface-container">
+                            <th class="px-4 py-3 text-left">Týždeň</th>
+                            <th class="px-4 py-3 text-left">Od</th>
+                            <th class="px-4 py-3 text-right">Naplánované</th>
+                            <th class="px-4 py-3 text-right">Splnené</th>
+                            <th class="px-4 py-3 text-right">Plnenie</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono text-[13px]">
+                        {% for w in plan.meta.rows %}
+                        <tr class="border-b border-white/5">
+                            <td class="px-4 py-2 text-on-surface-variant">{{ w.week }}</td>
+                            <td class="px-4 py-2 text-on-surface-variant">{{ w.from }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface">{{ w.planned }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface">{{ w.completed }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{% if w.pct is not none %}{{ w.pct }} %{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% else %}
+        <div class="border border-white/10 py-16 text-center">
+            <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+            <p class="text-on-surface mb-1">Za posledných {{ plan["values"]|length }} týždňov nebol naplánovaný žiadny tréning.</p>
+            <a href="{{ url_for('planovanie.index') }}"
+               class="inline-block mt-5 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors border-b border-white/25 pb-0.5">Otvoriť plán →</a>
+        </div>
+        {% endif %}
+    </section>
+
+    {# ════════ 5. Technika z videa ════════ #}
+    <section class="py-10 border-t border-white/10">
+        <div class="rule"><p class="eyebrow">05 · Technika z videa</p></div>
+
+        {% if tech.labels %}
+        {# Kontakt (ms) a kadencia (krokov/min) majú rôzne jednotky → dva grafy pod sebou, nie dve osi. #}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-8">
+            <div>
+                <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
+                    <h2 class="font-headline font-bold text-xl text-on-surface">Kontakt so zemou</h2>
+                    <p class="eyebrow">ms · priemer na krok</p>
+                </div>
+                <div class="bg-surface-container border border-white/10 p-5">
+                    <canvas id="chart-contact" height="110"></canvas>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-baseline justify-between flex-wrap gap-3 mb-4">
+                    <h2 class="font-headline font-bold text-xl text-on-surface">Kadencia</h2>
+                    <p class="eyebrow">krokov / min</p>
+                </div>
+                <div class="bg-surface-container border border-white/10 p-5">
+                    <canvas id="chart-cadence" height="110"></canvas>
+                </div>
+            </div>
+        </div>
+        <details class="mt-4">
+            <summary class="eyebrow cursor-pointer hover:text-on-surface transition-colors select-none">Zobraziť ako tabuľku</summary>
+            <div class="overflow-x-auto mt-4 border border-white/10">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-white/10 bg-surface-container">
+                            <th class="px-4 py-3 text-left">Dátum</th>
+                            <th class="px-4 py-3 text-left">Video</th>
+                            <th class="px-4 py-3 text-right">Kontakt (ms)</th>
+                            <th class="px-4 py-3 text-right">Kadencia</th>
+                            <th class="px-4 py-3 text-right">Asymetria (%)</th>
+                            <th class="px-4 py-3 text-right">Krokov</th>
+                            <th class="px-4 py-3 text-right">fps</th>
+                        </tr>
+                    </thead>
+                    <tbody class="mono text-[13px]">
+                        {% for v in tech.meta.rows %}
+                        <tr class="border-b border-white/5">
+                            <td class="px-4 py-2 text-on-surface-variant">{{ v.date }}</td>
+                            <td class="px-4 py-2 text-on-surface truncate max-w-[220px]">{{ v.label or '—' }}</td>
+                            <td class="px-4 py-2 text-right text-on-surface">{% if v.contact is not none %}{{ '%.0f'|format(v.contact) }}{% else %}—{% endif %}</td>
+                            <td class="px-4 py-2 text-right text-on-surface">{% if v.cadence is not none %}{{ '%.0f'|format(v.cadence) }}{% else %}—{% endif %}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{% if v.asymmetry is not none %}{{ '%.1f'|format(v.asymmetry) }}{% else %}—{% endif %}</td>
+                            <td class="px-4 py-2 text-right text-on-surface-variant">{{ v.steps if v.steps is not none else '—' }}</td>
+                            <td class="px-4 py-2 text-right {{ 'text-on-surface-variant' if not v.fps or v.fps >= 100 else '' }}" {% if v.fps and v.fps < 100 %}style="color:#c98500"{% endif %}>{% if v.fps %}{{ '%.0f'|format(v.fps) }}{% else %}—{% endif %}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </details>
+        {% else %}
+        <div class="border border-white/10 py-16 text-center">
+            <p class="eyebrow mb-3">Zatiaľ nie je čo kresliť</p>
+            <p class="text-on-surface mb-1">Žiadna uložená analýza videa.</p>
+            <a href="{{ url_for('video_page') }}"
+               class="inline-block mt-5 bg-primary px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em]">Analyzovať video</a>
+        </div>
+        {% endif %}
+    </section>
+
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script id="grafy-data" type="application/json">{{ data|tojson }}</script>
+<script src="{{ url_for('static', filename='js/grafy.js') }}"></script>
 {% endblock %}

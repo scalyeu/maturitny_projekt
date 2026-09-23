@@ -246,7 +246,7 @@ def _metric(metric, athlete, discipline):
 # -----------------------------
 # Routy
 # -----------------------------
-@bp.route('/')
+@bp.route('/', strict_slashes=False)
 @login_required
 def index():
     athlete = _target_athlete()

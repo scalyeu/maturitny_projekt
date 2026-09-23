@@ -199,7 +199,7 @@ def plan_date(day):
 # -----------------------------
 # Kalendár
 # -----------------------------
-@bp.route('/')
+@bp.route('/', strict_slashes=False)
 @login_required
 def index():
     year, month = _month_from_args()

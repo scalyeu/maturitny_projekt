@@ -92,7 +92,7 @@ def _selectable_athletes():
     return athletes if len(athletes) > 1 else []
 
 
-@bp.route('/')
+@bp.route('/', strict_slashes=False)
 def page():
     return render_template('stopky/index.html',
                            eyebrow='Časomiera', title='Stopky s fotobunkou',

@@ -449,7 +449,8 @@ def _coach_dashboard():
     if g.user.is_admin:
         athletes = User.query.filter_by(role='zverenec').order_by(User.username).all()
     else:
-        athletes = User.query.filter_by(coach_id=g.user.id).order_by(User.username).all()
+        # Len potvrdení zverenci – čakajúca žiadosť nesmie prezradiť ani jeden výsledok.
+        athletes = User.query.filter_by(coach_id=g.user.id, coach_confirmed=True).order_by(User.username).all()
     athlete_ids = [a.id for a in athletes]
 
     today = date.today()

@@ -45,8 +45,10 @@ def load_user():
     # Predvolený admin/admin sa nesmie používať – kým si heslo nezmení, nepustíme ho ďalej.
     if g.user is not None and g.user.must_change_password:
         allowed = {'auth.change_password', 'auth.logout', 'static'}
-        if request.endpoint and request.endpoint not in allowed \
-                and not request.path.startswith('/api/'):
+        if request.endpoint and request.endpoint not in allowed:
+            if _wants_json():
+                # JSON volania nemajú kam presmerovať – vrátia jasnú chybu namiesto tichého prechodu.
+                return jsonify({'error': 'Najskôr si zmeň predvolené heslo.'}), 403
             flash('Najskôr si zmeň predvolené heslo.', 'warning')
             return redirect(url_for('auth.change_password'))
 

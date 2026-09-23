@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+{% block title %}Zverenci · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">{{ current_user.role_label }} · {{ current_user.display_name }}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Zverenci</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="#pridat" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Pridať zverenca</a>
+            <a href="{{ url_for('planovanie.index') }}"
+               class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Plán</a>
+        </div>
+    </div>
+
+    <!-- ── Čísla ── -->
+    <div class="grid grid-cols-3 gap-px bg-white/10 border border-white/10 mb-11">
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">{{ 'Zverenci celkom' if current_user.is_admin else 'Moji zverenci' }}</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ athlete_count }}</p>
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Čaká na potvrdenie</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none {{ 'text-on-surface' if not pending else '' }}"
+               {% if pending %}style="color:#d9a23a"{% endif %}>{{ pending|length }}</p>
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Výsledkov spolu</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ stats.values()|map(attribute='count')|sum }}</p>
+        </div>
+    </div>
+
+    <!-- ── Zoznam ── -->
+    {% for coach, members in groups %}
+    <section class="mb-11">
+        <div class="rule">
+            <p class="eyebrow">
+                {% if current_user.is_admin %}
+                    {% if coach %}Tréner · {{ coach.display_name }} <span class="text-on-surface-variant/60">({{ coach.username }})</span>{% else %}Bez trénera{% endif %}
+                {% else %}Moji zverenci{% endif %}
+            </p>
+            <p class="eyebrow">{{ members|length }}</p>
+        </div>
+
+        {% if members %}
+        <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-white/10">
+                    <th class="py-2.5 text-left">Používateľské meno</th>
+                    <th class="py-2.5 text-left">Meno</th>
+                    <th class="py-2.5 text-right">Výsledkov</th>
+                    <th class="py-2.5 text-left pl-4">Posledný výsledok</th>
+                    <th class="py-2.5 text-left pl-4">Najbližší tréning</th>
+                    <th class="py-2.5 text-right"></th>
+                </tr>
+            </thead>
+            <tbody class="text-[13px]">
+                {% for a in members %}
+                {% set s = stats[a.id] %}
+                <tr class="border-b border-white/5 hover:bg-surface-container transition-colors">
+                    <td class="py-3">
+                        <a href="{{ url_for('trener.athlete_detail', athlete_id=a.id) }}"
+                           class="mono text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ a.username }}</a>
+                    </td>
+                    <td class="py-3 text-on-surface-variant">{{ a.full_name or '—' }}</td>
+                    <td class="py-3 mono text-right text-on-surface">{{ s.count }}</td>
+                    <td class="py-3 pl-4 mono text-on-surface-variant whitespace-nowrap">
+                        {% if s.last %}{{ s.last.discipline }} <span class="text-on-surface">{{ s.last.result_s|cas }}</span>
+                        <span class="text-on-surface-variant/60">· {{ s.last.date.strftime('%d.%m.%Y') }}</span>{% else %}—{% endif %}
+                    </td>
+                    <td class="py-3 pl-4 text-on-surface-variant">
+                        {% if s.next %}<span class="mono">{{ s.next.date.strftime('%d.%m.') }}</span> {{ s.next.title }}{% else %}—{% endif %}
+                    </td>
+                    <td class="py-3 text-right whitespace-nowrap">
+                        <a href="{{ url_for('trener.athlete_detail', athlete_id=a.id) }}" class="eyebrow hover:text-on-surface transition-colors">Detail →</a>
+                        {% if a.coach_id == current_user.id or current_user.is_admin %}
+                        <form method="POST" action="{{ url_for('trener.detach_athlete', athlete_id=a.id) }}" class="inline ml-3"
+                              onsubmit="return confirm('Odpojiť zverenca {{ a.username }}? Jeho údaje prestaneš vidieť.');">
+                            <button type="submit" class="eyebrow hover:text-[#e66767] transition-colors">Odpojiť</button>
+                        </form>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="font-headline font-bold text-2xl text-on-surface mb-2">Zatiaľ nemáš zverencov</p>
+        <p class="text-on-surface-variant max-w-[52ch]">
+            Zverenec sa zaregistruje a povie ti svoje používateľské meno. Pridáš ho nižšie – po tom, ako
+            žiadosť potvrdí, uvidíš jeho tréningy, analýzy videí a výsledky. Alebo mu účet vytvoríš rovno ty.
+        </p>
+        {% endif %}
+    </section>
+    {% endfor %}
+
+    <!-- ── Čakajúce žiadosti ── -->
+    {% if pending %}
+    <section class="mb-11">
+        <div class="rule"><p class="eyebrow" style="color:#d9a23a">Čaká na potvrdenie zverencom</p></div>
+        <p class="text-on-surface-variant max-w-[60ch] mb-4">
+            Títo zverenci majú od teba žiadosť. Kým ju nepotvrdia vo svojej sekcii Výsledky, ich údaje nevidíš.
+        </p>
+        <table class="w-full">
+            <tbody class="text-[13px]">
+                {% for a in pending %}
+                <tr class="border-b border-white/5">
+                    <td class="py-3 mono text-on-surface">{{ a.username }}</td>
+                    <td class="py-3 text-on-surface-variant">{{ a.full_name or '—' }}</td>
+                    <td class="py-3 text-right">
+                        <form method="POST" action="{{ url_for('trener.detach_athlete', athlete_id=a.id) }}" class="inline">
+                            <button type="submit" class="eyebrow hover:text-[#e66767] transition-colors">Zrušiť žiadosť</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+    {% endif %}
+
+    <!-- ── Pridanie zverenca ── -->
+    <section id="pridat" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-surface-container border border-white/10 p-6">
+            <div class="rule"><p class="eyebrow">Pridať existujúceho zverenca</p></div>
+            <p class="text-on-surface-variant text-[13px] mb-5">
+                Zverenec už má účet. Zadaj jeho používateľské meno – dostane žiadosť, ktorú musí potvrdiť.
+            </p>
+            <form method="POST" action="{{ url_for('trener.attach_athlete') }}" class="space-y-5">
+                <div>
+                    <label for="attach-username">Používateľské meno</label>
+                    <input type="text" id="attach-username" name="username" required maxlength="32"
+                           autocomplete="off" placeholder="napr. jan.novak">
+                </div>
+                <button type="submit" class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors w-full">
+                    Poslať žiadosť
+                </button>
+            </form>
+        </div>
+
+        <div class="bg-surface-container border border-white/10 p-6">
+            <div class="rule"><p class="eyebrow">Vytvoriť nový účet zverenca</p></div>
+            <p class="text-on-surface-variant text-[13px] mb-5">
+                Zverenec ešte účet nemá. Heslo mu odovzdáš; pri prvom prihlásení si ho musí zmeniť.
+            </p>
+            <form method="POST" action="{{ url_for('trener.create_athlete') }}" class="space-y-5" autocomplete="off">
+                <div>
+                    <label for="new-username">Používateľské meno</label>
+                    <input type="text" id="new-username" name="username" required minlength="3" maxlength="32"
+                           pattern="[a-z0-9_.\-]{3,32}" autocomplete="off" placeholder="malé písmená, číslice, . _ -">
+                </div>
+                <div>
+                    <label for="new-full-name">Meno a priezvisko</label>
+                    <input type="text" id="new-full-name" name="full_name" maxlength="120" placeholder="nepovinné">
+                </div>
+                <div>
+                    <label for="new-password">Dočasné heslo</label>
+                    <input type="text" id="new-password" name="password" required minlength="6" autocomplete="new-password"
+                           class="mono w-full" placeholder="aspoň 6 znakov">
+                </div>
+                <button type="submit" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] w-full">
+                    Vytvoriť účet
+                </button>
+            </form>
+        </div>
+    </section>
+
+</main>
+{% endblock %}

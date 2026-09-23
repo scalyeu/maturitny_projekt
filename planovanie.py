@@ -9,6 +9,7 @@ Prístup: zverenec vidí a plní len svoje plány; tréner plánuje len svojim
 (potvrdeným) zverencom a upravuje len vlastné plány; admin všetko.
 """
 from datetime import date, datetime, timedelta
+from functools import wraps
 
 from flask import (Blueprint, render_template, request, redirect, url_for,
                    flash, g, abort, jsonify)
@@ -105,6 +106,19 @@ def _target_athlete(choices=None):
     if athlete.id == g.user.id:
         abort(404)
     return athlete
+
+
+def _api_login_required(view):
+    """
+    login_required z auth.py vracia JSON 401 len pre cesty /api/…; naša cesta je /plan/api/…,
+    takže by neprihláseného presmerovala na HTML prihlásenie. JS klient potrebuje 401 JSON.
+    """
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if g.get('user') is None:
+            return jsonify({'error': 'Najskôr sa prihlás.'}), 401
+        return view(*args, **kwargs)
+    return wrapped
 
 
 def _load_plan(plan_id):
@@ -227,7 +241,7 @@ def index():
 
 
 @bp.route('/api/kalendar')
-@login_required
+@_api_login_required
 def api_calendar():
     """JSON {date: [{id, title, completed}]} pre daný mesiac a zverenca."""
     today = date.today()

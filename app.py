@@ -1,4 +1,5 @@
 import os
+import math
 import re
 import shutil
 import time
@@ -664,6 +665,16 @@ def import_whoop():
             if hrv_val is None:
                 total_skipped += 1
                 continue
+
+            # Fyziologicky nezmyselné hodnoty (záporné, nekonečno, recovery 300 %) sa neukladajú –
+            # inak by pokazili priemery a grafy. Neplatné recovery/RHR sa len vynechajú, HRV je povinné.
+            if not math.isfinite(hrv_val) or not (0 < hrv_val < 500):
+                total_skipped += 1
+                continue
+            if rec_num is not None and (not math.isfinite(rec_num) or not (0 <= rec_num <= 100)):
+                rec_num = None
+            if rhr_num is not None and (not math.isfinite(rhr_num) or not (20 <= rhr_num <= 250)):
+                rhr_num = None
 
             # Duplicita sa hľadá len v záznamoch tohto používateľa
             if BiometricLog.query.filter_by(user_id=g.user.id, date=entry_date).first():

@@ -146,7 +146,7 @@ def parse_result_form(form):
 
     competition = (form.get('competition') or '').strip()[:160] or None
     place = (form.get('place') or '').strip()[:20] or None
-    note = (form.get('note') or '').strip() or None
+    note = (form.get('note') or '').strip()[:2000] or None   # rovnaký strop ako ostatné textové polia
 
     if errors:
         return None, errors

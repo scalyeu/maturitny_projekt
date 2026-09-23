@@ -8,6 +8,7 @@ Blueprint 'auth' + pomocné funkcie, ktoré používajú všetky ostatné moduly
   - athlete_ids_visible_to()    množina id používateľov, ktorých údaje smie vidieť
   - require_visible_athlete()   načíta zverenca alebo skončí 403
 """
+import time
 import re
 from functools import wraps
 from urllib.parse import urlparse
@@ -203,6 +204,25 @@ def _default_admin_pending():
 # -----------------------------
 # Routy
 # -----------------------------
+# Neúspešné pokusy o prihlásenie: (meno, IP) -> časy pokusov za posledných LOGIN_WINDOW_S sekúnd.
+# Beží v pamäti – po reštarte sa zabudne, na školský projekt to stačí a nepotrebuje ďalšiu tabuľku.
+_failed_logins = {}
+LOGIN_MAX_ATTEMPTS = 5
+LOGIN_WINDOW_S = 60
+
+
+def _login_throttled(key):
+    now = time.time()
+    attempts = [t for t in _failed_logins.get(key, []) if now - t < LOGIN_WINDOW_S]
+    _failed_logins[key] = attempts
+    return len(attempts) >= LOGIN_MAX_ATTEMPTS
+
+
+def _note_failed_login(key):
+    _failed_logins.setdefault(key, []).append(time.time())
+
+
+
 @bp.route('/prihlasenie', methods=['GET', 'POST'])
 def login():
     if g.user is not None and request.method == 'GET':
@@ -211,12 +231,19 @@ def login():
     if request.method == 'POST':
         username = (request.form.get('username') or '').strip().lower()
         password = request.form.get('password') or ''
+        key = (username, request.remote_addr or '?')
+        if _login_throttled(key):
+            flash('Príliš veľa neúspešných pokusov. Skús to znova o minútu.', 'danger')
+            return render_template('auth/login.html', username=username,
+                                   show_admin_hint=_default_admin_pending()), 429
         user = User.query.filter_by(username=username).first() if username else None
         if user is None or not user.check_password(password):
+            _note_failed_login(key)
             flash('Nesprávne meno alebo heslo.', 'danger')
             return render_template('auth/login.html', username=username,
                                    show_admin_hint=_default_admin_pending()), 401
 
+        _failed_logins.pop(key, None)
         _login_session(user)
         flash(f'Vitaj, {user.display_name}.', 'success')
         nxt = _safe_next(request.form.get('next') or request.args.get('next'))

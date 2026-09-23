@@ -1,18 +1,276 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} · AtletCoach{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/stopky.css') }}">
+{% endblock %}
+
 {% block content %}
-<main class="mt-10 pb-12">
-    <div class="mb-8">
-        <p class="eyebrow mb-2">{{ eyebrow }}</p>
-        <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+<main class="mt-10 pb-12 stopky" id="stopky"
+      data-logged-in="{{ '1' if current_user else '0' }}">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-8">
+        <div>
+            <p class="eyebrow mb-2">{{ eyebrow }}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
+        </div>
+        <p class="mono text-[11px] text-on-surface-variant max-w-[44ch] leading-relaxed">
+            Medzerník = štart / stop · L = medzičas · R = reset.
+            Čiaru v obraze potiahneš myšou alebo prstom.
+        </p>
     </div>
-    <p class="eyebrow">Pripravuje sa</p>
-    {% if not current_user %}
-    <p class="text-[13px] text-on-surface-variant mt-6">
-        Stopky fungujú aj bez prihlásenia. Ak chceš výsledok uložiť k zverencovi,
-        <a href="{{ url_for('auth.login') }}" class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">prihlás sa</a>.
-    </p>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        <!-- ── Kamera + fotobunka ── -->
+        <section class="lg:col-span-7 min-w-0">
+            <div class="cam-wrap" id="cam-wrap">
+                <video id="cam" playsinline muted autoplay></video>
+                <canvas id="overlay" aria-label="Cieľová čiara – potiahni ju na miesto cieľa"></canvas>
+
+                <div class="cam-status">
+                    <span class="eyebrow state-label" id="st-ready">Pripravené</span>
+                    <span class="eyebrow state-label" id="st-running">Beží</span>
+                    <span class="eyebrow state-label" id="st-crossed">Cieľ pretnutý</span>
+                </div>
+
+                <div class="cam-msg" id="cam-msg">
+                    <p class="font-headline font-bold text-lg text-on-surface mb-2">Kamera je vypnutá</p>
+                    <p class="text-[13px] text-on-surface-variant max-w-[40ch] mx-auto" id="cam-msg-text">
+                        Zapni kameru a potiahni cieľovú čiaru na miesto, kde bežec končí.
+                        Stopky fungujú aj bez kamery – ručne.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Aktivita fotobunky -->
+            <div class="mt-4">
+                <div class="flex items-baseline justify-between gap-4 mb-2">
+                    <p class="eyebrow">Aktivita fotobunky <span class="text-on-surface" id="activity-pct">0 %</span></p>
+                    <p class="eyebrow" id="cell-status">kamera vypnutá</p>
+                </div>
+                <div class="activity">
+                    <div class="activity-fill" id="activity-fill"></div>
+                    <div class="activity-mark" title="Prah zopnutia: 25 % bodov na čiare"></div>
+                </div>
+                <p class="mono text-[11px] text-on-surface-variant mt-2" id="precision">
+                    Presnosť fotobunky: ±33 ms pri 30 fps kamere
+                </p>
+            </div>
+
+            <!-- Ovládanie kamery -->
+            <div class="mt-5 flex flex-wrap gap-2.5">
+                <button type="button" id="btn-cam"
+                        class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Zapnúť kameru
+                </button>
+                <button type="button" id="btn-calib" disabled
+                        class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Kalibrovať
+                </button>
+                <button type="button" id="btn-flip" disabled class="hidden border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Otočiť kameru
+                </button>
+                <button type="button" id="btn-sound" disabled
+                        class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors">
+                    Štart na zvuk
+                </button>
+            </div>
+
+            <!-- Nastavenia fotobunky -->
+            <div class="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-x-8 gap-y-5">
+                <div>
+                    <div class="flex items-baseline justify-between mb-1.5">
+                        <label for="threshold" class="eyebrow">Citlivosť</label>
+                        <span class="mono text-[11px] text-on-surface" id="threshold-val">40</span>
+                    </div>
+                    <input type="range" id="threshold" min="10" max="120" step="5" value="40" class="range">
+                    <p class="text-[11px] text-on-surface-variant mt-1">Nižšie číslo = citlivejšie (prah zmeny jasu z 255).</p>
+                </div>
+                <div>
+                    <div class="flex items-baseline justify-between mb-1.5">
+                        <label for="guard" class="eyebrow">Ochranná doba</label>
+                        <span class="mono text-[11px] text-on-surface" id="guard-val">1,0 s</span>
+                    </div>
+                    <input type="range" id="guard" min="0" max="5" step="0.5" value="1" class="range">
+                    <p class="text-[11px] text-on-surface-variant mt-1">Po štarte fotobunka toľko sekúnd nereaguje – ruka štartéra ju nezopne.</p>
+                </div>
+                <div>
+                    <label for="cell-action" class="eyebrow block mb-1.5">Pri pretnutí</label>
+                    <select id="cell-action" class="w-full">
+                        <option value="stop">zastaviť čas</option>
+                        <option value="lap">zapísať medzičas</option>
+                    </select>
+                    <p class="text-[11px] text-on-surface-variant mt-1">Medzičas sa hodí pri opakovaných prebehoch.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ── Časomiera ── -->
+        <section class="lg:col-span-5 min-w-0">
+            <div class="bg-surface-container border border-white/10">
+                <div class="time-box px-5 pt-6 pb-4 border-b border-white/10">
+                    <p class="eyebrow mb-3" id="time-label">Čas</p>
+                    <p class="time font-headline font-extrabold leading-none text-on-surface" id="time" aria-live="off">00:00.00</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-px bg-white/10">
+                    <button type="button" id="btn-start"
+                            class="bg-primary py-5 text-[12px] font-semibold uppercase tracking-[0.12em]">
+                        Štart
+                    </button>
+                    <button type="button" id="btn-stop" disabled
+                            class="bg-surface-container hover:bg-surface-container-high py-5 text-[12px] font-semibold uppercase tracking-[0.12em] text-on-surface transition-colors">
+                        Stop
+                    </button>
+                    <button type="button" id="btn-lap" disabled
+                            class="bg-surface-container hover:bg-surface-container-high py-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface transition-colors">
+                        Medzičas
+                    </button>
+                    <button type="button" id="btn-reset" disabled
+                            class="bg-surface-container hover:bg-surface-container-high py-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-on-surface transition-colors">
+                        Reset
+                    </button>
+                </div>
+
+                <div class="px-5 py-4 border-t border-white/10">
+                    <div class="flex items-baseline justify-between mb-2">
+                        <p class="eyebrow">Medzičasy</p>
+                        <p class="eyebrow" id="laps-count">0</p>
+                    </div>
+                    <ol class="mono text-[13px] laps" id="laps">
+                        <li class="text-on-surface-variant py-2" id="laps-empty">Zatiaľ žiadne. Počas behu stlač Medzičas alebo L.</li>
+                    </ol>
+                </div>
+            </div>
+
+            <!-- ── Uloženie výsledku ── -->
+            {% if current_user %}
+            <form method="POST" action="{{ url_for('stopky.save') }}"
+                  class="mt-4 bg-surface-container border border-white/10 p-5 space-y-4 hidden" id="save-box">
+                <div class="flex items-baseline justify-between gap-4">
+                    <p class="eyebrow">Uložiť výsledok</p>
+                    <p class="mono text-[13px] text-on-surface" id="save-summary">—</p>
+                </div>
+                <input type="hidden" name="result_s" id="result_s" value="">
+                <input type="hidden" name="laps" id="laps_field" value="">
+                <input type="hidden" name="stop_mode" id="stop_mode" value="">
+                <input type="hidden" name="precision_ms" id="precision_ms" value="">
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label for="discipline">Disciplína</label>
+                        <select id="discipline" name="discipline">
+                            {% for d in disciplines %}
+                            <option value="{{ d }}" {% if d == '100m' %}selected{% endif %}>{{ d }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div id="discipline-custom-box" class="hidden">
+                        <label for="discipline_custom">Aká?</label>
+                        <input type="text" id="discipline_custom" name="discipline_custom" maxlength="40" placeholder="napr. 150m letmo">
+                    </div>
+                    {% if athletes %}
+                    <div class="col-span-2">
+                        <label for="athlete_id">Zverenec</label>
+                        <select id="athlete_id" name="athlete_id">
+                            {% for a in athletes %}
+                            <option value="{{ a.id }}" {% if a.id == current_user.id %}selected{% endif %}>
+                                {{ a.username }}{% if a.id == current_user.id %} (ja){% elif a.full_name %} – {{ a.full_name }}{% endif %}
+                            </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% endif %}
+                </div>
+                <div>
+                    <label for="note">Poznámka</label>
+                    <textarea id="note" name="note" rows="2" maxlength="500" placeholder="dráha, vietor, tréning…"></textarea>
+                </div>
+                <button type="submit" class="w-full bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+                    Uložiť výsledok
+                </button>
+                <p class="text-[11px] text-on-surface-variant">
+                    Uloží sa s dnešným dátumom ako výsledok zo stopiek; medzičasy a spôsob zastavenia idú do poznámky.
+                </p>
+            </form>
+            {% else %}
+            <p class="mt-4 text-[13px] text-on-surface-variant hidden" id="save-box">
+                <a href="{{ url_for('auth.login', next=url_for('stopky.page')) }}"
+                   class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">Prihlás sa</a>,
+                aby si výsledok uložil. Stopky fungujú aj bez účtu.
+            </p>
+            {% endif %}
+        </section>
+    </div>
+
+    <!-- ── Posledné merania ── -->
+    {% if current_user %}
+    <section class="mt-12">
+        <div class="rule"><p class="eyebrow">Posledné merania zo stopiek</p></div>
+        {% if recent %}
+        <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-white/10">
+                    <th class="py-2.5 text-left">Dátum</th>
+                    {% if not current_user.is_athlete %}<th class="py-2.5 text-left">Zverenec</th>{% endif %}
+                    <th class="py-2.5 text-left">Disciplína</th>
+                    <th class="py-2.5 text-right">Čas</th>
+                    <th class="py-2.5 text-left pl-6">Poznámka</th>
+                </tr>
+            </thead>
+            <tbody class="mono text-[13px]">
+                {% for r in recent %}
+                <tr class="border-b border-white/5 align-top">
+                    <td class="py-3 text-on-surface-variant whitespace-nowrap">{{ r.date.strftime('%d.%m.%Y') }}</td>
+                    {% if not current_user.is_athlete %}
+                    <td class="py-3 text-on-surface whitespace-nowrap">{{ r.athlete.username if r.athlete else '—' }}</td>
+                    {% endif %}
+                    <td class="py-3 text-on-surface-variant whitespace-nowrap">{{ r.discipline }}</td>
+                    <td class="py-3 text-right text-on-surface whitespace-nowrap">{{ r.result_text }}</td>
+                    <td class="py-3 pl-6 text-on-surface-variant text-[11px] leading-relaxed whitespace-pre-line">{{ r.note or '—' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        </div>
+        {% else %}
+        <p class="text-on-surface-variant py-6">Zatiaľ žiadne uložené merania. Odmeraj čas a ulož ho k disciplíne.</p>
+        {% endif %}
+    </section>
     {% endif %}
+
+    <!-- ── Ako to funguje ── -->
+    <section class="mt-12">
+        <div class="rule"><p class="eyebrow">Ako fotobunka funguje</p></div>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/10 border border-white/10">
+            {% set steps = [
+                ('01', 'Postav kameru',
+                 'Telefón alebo notebook postav kolmo na dráhu, stabilne, s pokojným pozadím za cieľom. Zapni kameru a potiahni čiaru presne na cieľ – môže byť aj šikmá.'),
+                ('02', 'Kalibruj',
+                 'Pri prázdnom cieli stlač Kalibrovať. Fotobunka si zapamätá jas ~64 bodov na čiare a pomaly ho dolaďuje, kým sa nič nehýbe.'),
+                ('03', 'Štart',
+                 'Po štarte je fotobunka počas ochrannej doby nečinná. Keď sa naraz zmení aspoň štvrtina bodov na čiare v dvoch snímkach po sebe, čas sa zastaví.'),
+            ] %}
+            {% for num, heading, text in steps %}
+            <div class="bg-surface-container px-5 py-6">
+                <p class="mono text-[11px] text-on-surface-variant mb-4">{{ num }}</p>
+                <p class="font-headline font-bold text-on-surface mb-2">{{ heading }}</p>
+                <p class="text-[13px] text-on-surface-variant leading-relaxed">{{ text }}</p>
+            </div>
+            {% endfor %}
+        </div>
+        <p class="text-[12px] text-on-surface-variant mt-4 max-w-[80ch] leading-relaxed">
+            Presnosť je daná snímkovou frekvenciou kamery (pri 30 fps ±33 ms) a oneskorením kamery v prehliadači, ktoré sa neodpočítava.
+            Na oficiálne výsledky to nestačí, na tréningové merania a porovnanie medzi sebou áno.
+            Kamera funguje len cez zabezpečené spojenie (https alebo localhost); bez nej ostávajú ručné stopky.
+        </p>
+    </section>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/stopky.js') }}" defer></script>
 {% endblock %}

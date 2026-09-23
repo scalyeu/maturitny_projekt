@@ -1,0 +1,139 @@
+/* Stopky s fotobunkou – len to, čo Tailwind triedy z base.html nevedia:
+   prekrytie kamery plátnom, posuvníky bez rámčeka a veľký čas podľa šírky stĺpca. */
+
+/* ── Kamera + plátno s čiarou ── */
+.cam-wrap {
+    position: relative;
+    background: #101011;
+    border: 1px solid var(--line);
+    aspect-ratio: 16 / 9;          /* JS prepíše podľa skutočného pomeru kamery */
+    overflow: hidden;
+    max-height: 72vh;
+}
+.cam-wrap video {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    background: #000;
+}
+.cam-wrap canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    touch-action: none;            /* ťahanie čiary prstom nemá rolovať stránku */
+    cursor: crosshair;
+    user-select: none;
+    -webkit-user-select: none;
+}
+.cam-wrap.cam-off canvas { cursor: default; }
+
+/* Stavy fotobunky v rohu obrazu – aktívny je biely / volt, ostatné stlmené. */
+.cam-status {
+    position: absolute;
+    top: 10px;
+    left: 12px;
+    display: flex;
+    gap: 14px;
+    pointer-events: none;
+}
+.state-label {
+    color: rgba(139,139,132,0.55);
+    padding: 3px 6px;
+    background: rgba(11,11,12,0.72);
+}
+.state-label.on { color: #ece9e3; }
+.state-label.on.volt { color: var(--volt); }
+
+.cam-msg {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    text-align: center;
+    padding: 24px;
+    background: #101011;
+}
+.cam-wrap.cam-on .cam-msg { display: none; }
+
+/* ── Aktivita fotobunky ── */
+.activity {
+    position: relative;
+    height: 4px;
+    background: rgba(236,233,227,0.08);
+}
+.activity-fill {
+    height: 100%;
+    width: 0;
+    background: #8b8b84;
+    transition: width 60ms linear;
+}
+.activity-fill.hot { background: var(--volt); }
+.activity-mark {
+    position: absolute;
+    left: 25%;
+    top: -3px;
+    width: 1px;
+    height: 10px;
+    background: var(--line-strong);
+}
+
+/* ── Posuvníky: base.html dáva každému inputu rámček a výplň, tu to nechceme ── */
+.stopky input[type="range"].range {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 24px;
+    margin: 0;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    cursor: pointer;
+}
+.stopky input[type="range"].range::-webkit-slider-runnable-track {
+    height: 2px;
+    background: var(--line-strong);
+}
+.stopky input[type="range"].range::-moz-range-track {
+    height: 2px;
+    background: var(--line-strong);
+}
+.stopky input[type="range"].range::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 12px;
+    height: 12px;
+    margin-top: -5px;
+    border-radius: 0;
+    border: none;
+    background: var(--volt);
+}
+.stopky input[type="range"].range::-moz-range-thumb {
+    width: 12px;
+    height: 12px;
+    border-radius: 0;
+    border: none;
+    background: var(--volt);
+}
+
+/* ── Čas ── */
+.time-box { container-type: inline-size; }
+.time {
+    /* 8 znakov Archivo ExtraBold ≈ 4,1 em; 22 % šírky stĺpca dá na desktope ~96 px
+       a na 375 px telefóne ~66 px bez horizontálneho rolovania. */
+    font-size: 64px;
+    font-size: clamp(52px, 22cqw, 100px);
+    letter-spacing: -0.03em;
+    white-space: nowrap;
+}
+.time.running { color: var(--volt); }
+
+.laps { max-height: 220px; overflow-y: auto; }
+.laps li { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px solid rgba(236,233,227,0.05); }
+.laps li:last-child { border-bottom: none; }
+.laps .lap-idx { color: #8b8b84; width: 2.5ch; }
+.laps .lap-split { color: #ece9e3; }
+.laps .lap-total { color: #8b8b84; }

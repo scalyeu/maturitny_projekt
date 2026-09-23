@@ -1,5 +1,5 @@
 @echo off
-title 400m Sprint AI Predictor
+title AtletCoach
 echo ==============================================
 echo  STARTUJEM APLIKACIU
 echo ==============================================

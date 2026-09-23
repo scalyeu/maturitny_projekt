@@ -30,7 +30,7 @@ Medzičasy trvajú sekundy, preto stačí bežné video (±1 snímok = chyba pod
 Krátke veličiny (let nad prekážkou, kontakty) sa síce počítajú a ukladajú do
 JSON-u, ale stránka ich nezobrazuje – pri bežnom videu by boli len orientačné.
 
-Autor: maturitný projekt – Track AI (Sprint Predictor)
+Autor: maturitný projekt – AtletCoach
 """
 
 from __future__ import annotations

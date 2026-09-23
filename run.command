@@ -1,6 +1,6 @@
 #!/bin/bash
 # ============================================================
-#  400m Sprint AI Predictor — spustenie na macOS
+#  AtletCoach — spustenie na macOS
 #  Dvojklikom v Finderi (alebo z Terminálu: ./run.command)
 # ============================================================
 

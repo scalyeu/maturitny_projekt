@@ -32,7 +32,7 @@ DÔLEŽITÉ – PRESNOSŤ:
     Preto NATÁČAJ V SPOMALENOM REŽIME (120 alebo 240 fps).
     Modul vždy vracia aj odhad neistoty merania (`uncertainty_ms`).
 
-Autor: maturitný projekt – Track AI (Sprint Predictor)
+Autor: maturitný projekt – AtletCoach
 """
 
 from __future__ import annotations

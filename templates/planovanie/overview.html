@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}Prehľad splnenia · AtletCoach{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='css/planovanie.css') }}">{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">Plán · posledných {{ past_days }} dní · {{ since|plan_date }} – {{ today|plan_date }}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Prehľad splnenia</h1>
+        </div>
+        <a href="{{ url_for('planovanie.index') }}"
+           class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Kalendár</a>
+    </div>
+
+    <!-- ── Čísla ── -->
+    <div class="grid grid-cols-3 gap-px bg-white/10 border border-white/10">
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Naplánované</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ totals.planned }}</p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">s termínom do dnes</p>
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Splnené</p>
+            {% if totals.pct is not none %}
+            <p class="font-headline font-extrabold text-[34px] leading-none" style="color:var(--volt)">
+                {{ totals.pct }}<span class="mono text-xs font-normal text-on-surface-variant ml-1.5">%</span>
+            </p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">{{ totals.done }} z {{ totals.planned }} tréningov</p>
+            {% else %}
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface"><span class="text-on-surface-variant text-[20px] align-middle">—</span></p>
+            <p class="mono text-[11px] text-on-surface-variant mt-2">žiadne uplynulé tréningy</p>
+            {% endif %}
+        </div>
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Nesplnené po termíne</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none {% if not totals.missed %}text-on-surface{% endif %}"
+               {% if totals.missed %}style="color:#e66767"{% endif %}>{{ totals.missed }}</p>
+        </div>
+    </div>
+
+    <section class="py-11 grid grid-cols-1 lg:grid-cols-2 gap-x-14 gap-y-11">
+
+        <!-- ── Podľa zverenca ── -->
+        <div>
+            <div class="rule"><p class="eyebrow">{% if is_planner %}Podľa zverenca{% else %}Môj plán{% endif %}</p></div>
+            {% if rows %}
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="py-2.5 text-left">{% if is_planner %}Zverenec{% else %}Obdobie{% endif %}</th>
+                        <th class="py-2.5 text-right">Naplán.</th>
+                        <th class="py-2.5 text-right">Splnené</th>
+                        <th class="py-2.5 text-right">Po termíne</th>
+                        <th class="py-2.5 text-right">%</th>
+                    </tr>
+                </thead>
+                <tbody class="text-[13px]">
+                    {% for r in rows %}
+                    <tr class="border-b border-white/5 hover:bg-surface-container transition-colors">
+                        <td class="py-3">
+                            {% if is_planner %}
+                            <a href="{{ url_for('planovanie.index', athlete_id=r.athlete.id) }}" class="mono text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ r.athlete.username }}</a>
+                            {% if r.athlete.full_name %}<span class="text-on-surface-variant ml-2">{{ r.athlete.full_name }}</span>{% endif %}
+                            {% else %}
+                            <span class="text-on-surface-variant">posledných {{ past_days }} dní</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right mono text-on-surface">{{ r.planned }}</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ r.done }}</td>
+                        <td class="py-3 text-right mono {% if not r.missed %}text-on-surface-variant{% endif %}" {% if r.missed %}style="color:#e66767"{% endif %}>{{ r.missed }}</td>
+                        <td class="py-3 text-right mono">
+                            {% if r.pct is none %}<span class="text-on-surface-variant">—</span>
+                            {% else %}<span style="color:{% if r.pct >= 80 %}#a8c22f{% elif r.pct >= 50 %}#d9a23a{% else %}#e66767{% endif %}">{{ r.pct }} %</span>{% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            {% else %}
+            <p class="text-on-surface-variant py-4">Zatiaľ nemáš zverencov, ktorým by si plánoval.</p>
+            {% endif %}
+
+            {% if missed_list %}
+            <div class="rule mt-10"><p class="eyebrow" style="color:#e66767">Nesplnené po termíne</p></div>
+            <ul class="text-[13px]">
+                {% for p in missed_list %}
+                <li class="flex items-baseline justify-between gap-4 py-2.5 border-b border-white/5">
+                    <span class="min-w-0 truncate">
+                        <a href="{{ url_for('planovanie.day', iso=p.date.isoformat(), athlete_id=(p.athlete_id if is_planner else None)) }}" class="text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ p.title }}</a>
+                        {% if is_planner %}<span class="mono text-on-surface-variant ml-2">{{ p.athlete.username if p.athlete else '—' }}</span>{% endif %}
+                    </span>
+                    <span class="mono text-[12px] flex-shrink-0" style="color:#e66767">{{ p.date|plan_date }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+
+        <!-- ── Najbližších 7 dní ── -->
+        <div>
+            <div class="rule"><p class="eyebrow">Najbližších {{ upcoming_days }} dní · {{ today|plan_date }} – {{ until|plan_date }}</p></div>
+            {% if upcoming %}
+            {% for day, items in upcoming|groupby('date') %}
+            <div class="mb-5">
+                <p class="mono text-[11px] mb-1.5 {% if day == today %}{% else %}text-on-surface-variant{% endif %}" {% if day == today %}style="color:var(--volt)"{% endif %}>
+                    {{ WEEKDAYS_SK[day.weekday()] }} {{ day|plan_date }}{% if day == today %} · dnes{% endif %}
+                </p>
+                {% for p in items %}
+                <a href="{{ url_for('planovanie.day', iso=p.date.isoformat(), athlete_id=(p.athlete_id if is_planner else None)) }}"
+                   class="group flex items-baseline justify-between gap-4 py-2.5 border-b border-white/5 hover:border-white/25 transition-colors">
+                    <span class="min-w-0 truncate {% if p.completed %}text-on-surface-variant{% else %}text-on-surface{% endif %} group-hover:text-[color:var(--volt)] transition-colors">
+                        {% if p.completed %}<span style="color:#a8c22f">✓</span> {% endif %}{{ p.title }}
+                    </span>
+                    {% if is_planner %}<span class="mono text-[12px] text-on-surface-variant flex-shrink-0">{{ p.athlete.username if p.athlete else '—' }}</span>{% endif %}
+                </a>
+                {% endfor %}
+            </div>
+            {% endfor %}
+            {% else %}
+            <p class="text-on-surface-variant py-4">
+                V najbližších {{ upcoming_days }} dňoch nie je nič naplánované.
+                {% if is_planner %}<a href="{{ url_for('planovanie.index') }}" class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">Otvoriť kalendár →</a>{% endif %}
+            </p>
+            {% endif %}
+        </div>
+    </section>
+
+</main>
+{% endblock %}

@@ -1,0 +1,87 @@
+/* Plán tréningov – kalendár a deň.
+   Len to, čo Tailwind triedy z base.html nepokryjú: bunky kalendára a tri druhy
+   „čipov“ (naplánované / splnené / po termíne) + riadok reálneho zápisu. */
+
+.cal-cell {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 104px;
+    padding: 8px;
+    background: #161617;
+    color: #ece9e3;
+    transition: background-color 0.12s linear;
+    overflow: hidden;
+}
+.cal-cell:hover { background: #1c1c1d; }
+.cal-cell--muted { background: #101011; }
+.cal-cell--muted:hover { background: #101011; }
+/* Dnešok: číslo dňa vo volte a tenká volt linka hore. */
+.cal-cell--today { box-shadow: inset 0 2px 0 var(--volt); }
+.cal-cell--today .cal-num { color: var(--volt); }
+
+.cal-num {
+    font-size: 12px;
+    color: #8b8b84;
+    line-height: 1;
+    margin-bottom: 3px;
+}
+
+/* Naplánovaný tréning: obrys. Splnený: vyplnený, stlmený. Po termíne: červený obrys. */
+.plan-chip {
+    display: block;
+    font-size: 11px;
+    line-height: 1.25;
+    padding: 2px 6px;
+    border: 1px solid rgba(236,233,227,0.28);
+    color: #ece9e3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.plan-chip--done {
+    border-color: transparent;
+    background: rgba(236,233,227,0.08);
+    color: #8b8b84;
+}
+.plan-chip--missed {
+    border-color: #e66767;
+    color: #e66767;
+}
+
+/* Reálny zápis z denníka – drobný mono text, aby sa odlíšil od plánu. */
+.plan-log {
+    display: block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    color: #8b8b84;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Stavový štítok v detaile dňa a v prehľade. */
+.plan-status {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    white-space: nowrap;
+}
+.plan-status--done { color: #a8c22f; }
+.plan-status--pending { color: #8b8b84; }
+.plan-status--missed { color: #e66767; }
+
+/* <summary> ako tlačidlo – bez trojuholníka. */
+.plan-summary { list-style: none; cursor: pointer; }
+.plan-summary::-webkit-details-marker { display: none; }
+
+/* Legenda pod kalendárom. */
+.plan-legend { display: flex; flex-wrap: wrap; gap: 16px 22px; align-items: center; }
+.plan-legend .plan-chip, .plan-legend .plan-log { display: inline-block; }
+
+@media (max-width: 640px) {
+    .cal-cell { min-height: 72px; padding: 5px; }
+    .plan-chip { font-size: 10px; padding: 1px 4px; }
+}

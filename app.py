@@ -677,27 +677,9 @@ def trainings():
                            train_dates_json=json.dumps(train_dates))
 
 
-@app.route('/charts')
-def charts():
-    logs = BiometricLog.query.order_by(BiometricLog.date.asc()).all()
-    dates = [log.date.strftime('%Y-%m-%d') for log in logs]
-    hrv_data = [log.hrv for log in logs]
-    recovery_data = [log.recovery for log in logs]
-    has_hrv = any(v is not None and v > 0 for v in hrv_data)
-
-    return render_template(
-        'charts.html',
-        dates=dates,
-        hrv_data=hrv_data,
-        recovery_data=recovery_data,
-        has_hrv=has_hrv
-    )
-
-
 @app.route('/ai')
 def ai_portal():
     return render_template('ai.html')
-
 
 
 @app.route('/strava/login')
@@ -1176,112 +1158,6 @@ Otázka: "Ako som na tom s technikou?"
 Správna odpoveď: "Z posledného videa máš kontakt so zemou [X] ms pri frekvencii [Y] krokov/min.
 [Porovnanie s pásmom pre šprint.] Asymetria [Z] % — [interpretácia]. [Ak bolo video pod 100 fps
 alebo sa metódy nezhodli: upozorni na presnosť.] Konkrétne by som sa zameral na [cvičenie]." """
-
-
-@app.route('/api/biometric-history')
-def biometric_history():
-    days = request.args.get('days', type=int)  # 0 or None = all time
-    today = date.today()
-
-    def safe_avg(vals): return round(sum(vals) / len(vals), 1) if vals else None
-    def safe_max(vals): return max(vals) if vals else None
-    def safe_min(vals): return min(vals) if vals else None
-
-    def moving_avg(points, window=7):
-        result = []
-        for i, pt in enumerate(points):
-            vals = [p['y'] for p in points[max(0, i - window + 1):i + 1] if p['y'] is not None]
-            result.append({'x': pt['x'], 'y': round(sum(vals) / len(vals), 1) if vals else None})
-        return result
-
-    # Anchor the window to the most recent record, not today — so imported/older
-    # data still shows up in the default "last N days" view.
-    latest = BiometricLog.query.order_by(BiometricLog.date.desc()).first()
-    anchor = latest.date if latest else today
-
-    # Current period
-    query = BiometricLog.query.order_by(BiometricLog.date.asc())
-    if days and days > 0:
-        query = query.filter(BiometricLog.date >= anchor - timedelta(days=days))
-    logs = query.all()
-
-    # Previous equivalent period (for comparison overlay)
-    prev_logs = []
-    if days and days > 0:
-        prev_start = anchor - timedelta(days=days * 2)
-        prev_end   = anchor - timedelta(days=days)
-        prev_logs = BiometricLog.query.filter(
-            BiometricLog.date >= prev_start,
-            BiometricLog.date < prev_end
-        ).order_by(BiometricLog.date.asc()).all()
-
-    hrv_pts = [{'x': l.date.strftime('%Y-%m-%d'), 'y': l.hrv} for l in logs]
-    rhr_pts = [{'x': l.date.strftime('%Y-%m-%d'), 'y': l.rhr} for l in logs]
-    rec_pts = [{'x': l.date.strftime('%Y-%m-%d'), 'y': l.recovery if l.recovery else None} for l in logs]
-
-    # Previous period — align to same relative day index for overlay
-    prev_hrv = [{'x': logs[i].date.strftime('%Y-%m-%d') if i < len(logs) else None, 'y': p.hrv}
-                for i, p in enumerate(prev_logs)]
-    prev_rhr = [{'x': logs[i].date.strftime('%Y-%m-%d') if i < len(logs) else None, 'y': p.rhr}
-                for i, p in enumerate(prev_logs)]
-
-    hrv_vals = [l.hrv for l in logs if l.hrv is not None]
-    rhr_vals = [l.rhr for l in logs if l.rhr is not None]
-    rec_vals = [l.recovery for l in logs if l.recovery is not None]
-
-    # Trend: first half vs second half of selected period
-    mid = len(logs) // 2
-    first_hrv = [l.hrv for l in logs[:mid] if l.hrv]
-    second_hrv = [l.hrv for l in logs[mid:] if l.hrv]
-    hrv_trend_pct = round(((safe_avg(second_hrv) or 0) - (safe_avg(first_hrv) or 0)) /
-                          (safe_avg(first_hrv) or 1) * 100, 1) if first_hrv and second_hrv else None
-
-    first_rhr = [l.rhr for l in logs[:mid] if l.rhr]
-    second_rhr = [l.rhr for l in logs[mid:] if l.rhr]
-    rhr_trend_pct = round(((safe_avg(second_rhr) or 0) - (safe_avg(first_rhr) or 0)) /
-                          (safe_avg(first_rhr) or 1) * 100, 1) if first_rhr and second_rhr else None
-
-    # Green/yellow/red recovery distribution
-    green_days  = sum(1 for l in logs if l.recovery and l.recovery >= 67)
-    yellow_days = sum(1 for l in logs if l.recovery and 34 <= l.recovery < 67)
-    red_days    = sum(1 for l in logs if l.recovery and l.recovery < 34)
-
-    return jsonify({
-        'hrv':     hrv_pts,
-        'hrv_ma7': moving_avg(hrv_pts),
-        'rhr':     rhr_pts,
-        'rhr_ma7': moving_avg(rhr_pts),
-        'recovery':     rec_pts,
-        'recovery_ma7': moving_avg(rec_pts),
-        'prev_hrv': prev_hrv,
-        'prev_rhr': prev_rhr,
-        'date_range': {
-            'start': logs[0].date.strftime('%d.%m.%Y') if logs else None,
-            'end':   logs[-1].date.strftime('%d.%m.%Y') if logs else None,
-        },
-        'stats': {
-            'hrv_avg': safe_avg(hrv_vals),
-            'hrv_max': safe_max(hrv_vals),
-            'hrv_min': safe_min(hrv_vals),
-            'rhr_avg': safe_avg(rhr_vals),
-            'rhr_min': safe_min(rhr_vals),
-            'rhr_max': safe_max(rhr_vals),
-            'rec_avg': safe_avg(rec_vals),
-            'count':   len(logs),
-            'hrv_trend_pct': hrv_trend_pct,
-            'rhr_trend_pct': rhr_trend_pct,
-            'prev_hrv_avg': safe_avg([p.hrv for p in prev_logs if p.hrv]),
-            'prev_rhr_avg': safe_avg([p.rhr for p in prev_logs if p.rhr]),
-            'green_days':  green_days,
-            'yellow_days': yellow_days,
-            'red_days':    red_days,
-        }
-    })
-
-
-@app.route('/biometrics')
-def biometrics():
-    return render_template('biometrics.html')
 
 
 @app.route('/api/chat', methods=['POST'])

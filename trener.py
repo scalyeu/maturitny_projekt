@@ -287,6 +287,9 @@ def attach_athlete():
             flash(f'{athlete.display_name} už je tvoj zverenec.', 'info')
         else:
             flash(f'{athlete.display_name} už má od teba žiadosť – čaká na potvrdenie.', 'info')
+    elif athlete.coach_id is not None and not athlete.coach_confirmed:
+        # Čakajúcu žiadosť iného trénera neprepisujeme – rozhodnúť musí zverenec.
+        flash(f'{athlete.display_name} má čakajúcu žiadosť od iného trénera. Najskôr ju musí odmietnuť.', 'danger')
     elif athlete.coach_id is not None:
         flash(f'{athlete.display_name} už má trénera. Najskôr sa musí od neho odpojiť.', 'danger')
     else:

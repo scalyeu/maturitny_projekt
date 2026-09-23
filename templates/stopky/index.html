@@ -7,7 +7,8 @@
 
 {% block content %}
 <main class="mt-10 pb-12 stopky" id="stopky"
-      data-logged-in="{{ '1' if current_user else '0' }}">
+      data-logged-in="{{ '1' if current_user else '0' }}"
+      data-other-discipline="{{ other_discipline }}">
 
     <!-- ── Hlavička ── -->
     <div class="flex items-end justify-between flex-wrap gap-5 mb-8">

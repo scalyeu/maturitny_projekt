@@ -35,7 +35,9 @@
     position: absolute;
     top: 10px;
     left: 12px;
+    z-index: 2;                    /* nad správou o vypnutej kamere – stav vidno aj bez kamery */
     display: flex;
+    flex-wrap: wrap;
     gap: 14px;
     pointer-events: none;
 }
@@ -54,7 +56,7 @@
     flex-direction: column;
     justify-content: center;
     text-align: center;
-    padding: 24px;
+    padding: 40px 24px 24px;       /* miesto pre stavové popisky hore */
     background: #101011;
 }
 .cam-wrap.cam-on .cam-msg { display: none; }
@@ -137,3 +139,9 @@
 .laps .lap-idx { color: #8b8b84; width: 2.5ch; }
 .laps .lap-split { color: #ece9e3; }
 .laps .lap-total { color: #8b8b84; }
+
+/* Tlačidlo „Štart na zvuk“ počas čakania na tlesknutie. */
+.stopky button.listening {
+    border-color: var(--volt) !important;
+    color: var(--volt) !important;
+}

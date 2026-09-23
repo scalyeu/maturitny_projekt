@@ -60,7 +60,13 @@ def inject_user():
 # Dekorátory
 # -----------------------------
 def _wants_json():
-    return request.path.startswith('/api/') or request.path.endswith('/api')
+    # JSON cesty majú aj moduly (/grafy/api/…, /plan/api/…), nie len /api/… v app.py;
+    # fetch() volania sa navyše hlásia cez Accept, takže im nemá zmysel vracať HTML prihlásenie.
+    path = request.path
+    if path.startswith('/api/') or path.endswith('/api') or '/api/' in path:
+        return True
+    accept = request.headers.get('Accept', '')
+    return 'application/json' in accept and 'text/html' not in accept
 
 
 def login_required(view):

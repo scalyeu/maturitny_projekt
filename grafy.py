@@ -274,6 +274,14 @@ def api(metric):
     return jsonify(payload)
 
 
+@bp.before_request
+def _api_needs_json_401():
+    """Neprihlásený klient API má dostať 401 JSON, nie presmerovanie na login
+    (auth._wants_json pozná len cesty /api/..., naša je /grafy/api/...)."""
+    if request.path.startswith('/grafy/api/') and g.get('user') is None:
+        return jsonify({'error': 'Najskôr sa prihlás.'}), 401
+
+
 @bp.errorhandler(403)
 def _forbidden(_e):
     # /grafy/api/* nezačína na /api/, takže globálny handler by vrátil HTML – tu chceme JSON.

@@ -109,7 +109,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const res = DATA.vysledky;
     if (el('chart-results') && res.values.length) {
         const pbIdx = res.meta.pb_index;
-        const radii = res.values.map((_, i) => (i === pbIdx ? 6 : 3));
+        // Body sa nekreslia (pointRadius 0), jedine PB dostane veľkú značku.
+        const radii = res.values.map((_, i) => (i === pbIdx ? 6 : 0));
         const hoverRadii = res.values.map((_, i) => (i === pbIdx ? 8 : 5));
         new Chart(el('chart-results'), {
             type: 'line',
@@ -200,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el('chart-contact') && tech.labels.length) {
         new Chart(el('chart-contact'), {
             type: 'line',
-            data: { labels: tech.labels, datasets: [lineDataset(tech.values, MAGENTA, { pointRadius: 3, pointBackgroundColor: SURFACE, pointBorderColor: MAGENTA, pointBorderWidth: 2 })] },
+            data: { labels: tech.labels, datasets: [lineDataset(tech.values, MAGENTA)] },
             options: baseOptions({
                 yTick: (v) => v + ' ms',
                 tooltipLabel: (c) => c.parsed.y === null ? 'bez hodnoty' : Math.round(c.parsed.y) + ' ms',
@@ -211,7 +212,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el('chart-cadence') && tech.labels.length) {
         new Chart(el('chart-cadence'), {
             type: 'line',
-            data: { labels: tech.labels, datasets: [lineDataset(tech.meta.cadence, MAGENTA, { pointRadius: 3, pointBackgroundColor: SURFACE, pointBorderColor: MAGENTA, pointBorderWidth: 2 })] },
+            data: { labels: tech.labels, datasets: [lineDataset(tech.meta.cadence, MAGENTA)] },
             options: baseOptions({
                 yTick: (v) => v,
                 tooltipLabel: (c) => c.parsed.y === null ? 'bez hodnoty' : Math.round(c.parsed.y) + ' krokov/min',

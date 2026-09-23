@@ -1,0 +1,193 @@
+{% extends "base.html" %}
+{% block title %}Prehľad systému · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">Administrátor · stav aplikácie</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Prehľad systému</h1>
+        </div>
+        <div class="flex flex-wrap items-center gap-2.5">
+            <a href="{{ url_for('admin_panel.users') }}"
+               class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">Používatelia</a>
+            <p class="mono text-[11px] text-on-surface-variant">{{ now.strftime('%d.%m.%Y %H:%M') }}</p>
+        </div>
+    </div>
+
+    <!-- ── Účty ── -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-px bg-white/10 border border-white/10">
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">Účty spolu</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none text-on-surface">{{ totals.users }}</p>
+            {% if totals.must_change %}
+            <p class="mono text-[11px] text-on-surface-variant mt-2">{{ totals.must_change }} čaká na zmenu hesla</p>
+            {% endif %}
+        </div>
+        {% for r in ROLE_ORDER %}
+        <div class="bg-surface-container px-5 py-6">
+            <p class="eyebrow mb-3">{{ ROLE_LABELS[r] }}{% if r != 'admin' %}i{% endif %}</p>
+            <p class="font-headline font-extrabold text-[34px] leading-none {{ 'text-on-surface' if r != 'admin' else '' }}"
+               {% if r == 'admin' %}style="color:var(--volt)"{% endif %}>{{ role_counts.get(r, 0) }}</p>
+            {% if r == 'zverenec' and totals.pending_links %}
+            <p class="mono text-[11px] mt-2" style="color:#c98500">{{ totals.pending_links }} nepotvrdených trénerov</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- ── Dáta ── -->
+    <section class="mt-11">
+        <div class="rule"><p class="eyebrow">Údaje v databáze</p></div>
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-px bg-white/10 border border-white/10">
+            {% for label, value, sub in [
+                ('Tréningy', totals.trainings, none),
+                ('Výsledky', totals.results, none),
+                ('Plán', totals.planned, totals.planned_done ~ ' splnených' if totals.planned else none),
+                ('Videá', totals.videos, none),
+                ('Prekážky', totals.hurdles, none),
+                ('Biometrika', totals.biometrics, none),
+                ('AI správy', totals.chat, none),
+            ] %}
+            <div class="bg-surface-container px-5 py-5">
+                <p class="eyebrow mb-3">{{ label }}</p>
+                <p class="font-headline font-extrabold text-[28px] leading-none text-on-surface">{{ value }}</p>
+                {% if sub %}<p class="mono text-[11px] text-on-surface-variant mt-2">{{ sub }}</p>{% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="mt-11 grid grid-cols-1 lg:grid-cols-2 gap-x-14 gap-y-11">
+
+        <!-- ── Posledné registrácie ── -->
+        <div>
+            <div class="rule">
+                <p class="eyebrow">Posledné registrácie</p>
+                <a href="{{ url_for('admin_panel.users') }}" class="eyebrow hover:text-on-surface transition-colors">Všetci →</a>
+            </div>
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="py-2.5 text-left">Používateľ</th>
+                        <th class="py-2.5 text-left">Rola</th>
+                        <th class="py-2.5 text-right">Vytvorený</th>
+                    </tr>
+                </thead>
+                <tbody class="text-[13px]">
+                    {% for u in last_users %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3">
+                            <a href="{{ url_for('admin_panel.edit_user', user_id=u.id) }}"
+                               class="mono text-on-surface hover:text-[color:var(--volt)] transition-colors">{{ u.username }}</a>
+                            {% if u.full_name %}<span class="text-on-surface-variant ml-2">{{ u.full_name }}</span>{% endif %}
+                        </td>
+                        <td class="py-3"><span class="eyebrow">{{ u.role_label }}</span></td>
+                        <td class="py-3 text-right mono text-on-surface-variant">{{ u.created_at.strftime('%d.%m.%Y %H:%M') }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── Disk a databáza ── -->
+        <div>
+            <div class="rule"><p class="eyebrow">Disk a databáza</p></div>
+            <table class="w-full">
+                <tbody class="text-[13px]">
+                    {% for s in storage %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">
+                            Videá{% if loop.index > 1 %} (starý adresár){% endif %}
+                            <p class="mono text-[10px] text-on-surface-variant/70 break-all">{{ s.path }}</p>
+                        </td>
+                        <td class="py-3 text-right mono text-on-surface whitespace-nowrap align-top">
+                            {{ s.size_text }}
+                            <span class="text-on-surface-variant"> · {{ s.files }} súb.</span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">
+                            Databáza
+                            <p class="mono text-[10px] text-on-surface-variant/70 break-all">{{ dbinfo.path }}</p>
+                        </td>
+                        <td class="py-3 text-right mono text-on-surface whitespace-nowrap align-top">{{ dbinfo.size_text }}</td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">Strava pripojenia</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ totals.strava }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── Prostredie ── -->
+        <div>
+            <div class="rule"><p class="eyebrow">Prostredie</p></div>
+            <table class="w-full">
+                <tbody class="text-[13px]">
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">Python</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ environment.python }}</td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">Flask</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ environment.flask }}</td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">SQLAlchemy</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ environment.sqlalchemy }}</td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">Systém</td>
+                        <td class="py-3 text-right mono text-on-surface">{{ environment.platform }}</td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">Debug režim</td>
+                        <td class="py-3 text-right mono" style="color:{{ '#c98500' if environment.debug else '#a8c22f' }}">
+                            {{ 'zapnutý' if environment.debug else 'vypnutý' }}
+                        </td>
+                    </tr>
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">
+                            Analýza videa (OpenCV + MediaPipe)
+                            {% if not environment.mediapipe.ok %}
+                            <p class="mono text-[10px] text-on-surface-variant/70">{{ environment.mediapipe.text }}</p>
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right mono align-top" style="color:{{ '#a8c22f' if environment.mediapipe.ok else '#e66767' }}">
+                            {{ 'dostupná' if environment.mediapipe.ok else 'nedostupná' }}
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- ── Kľúče v .env ── -->
+        <div>
+            <div class="rule"><p class="eyebrow">Kľúče v .env</p></div>
+            <table class="w-full">
+                <tbody class="text-[13px]">
+                    {% for name, label, ok in environment.env %}
+                    <tr class="border-b border-white/5">
+                        <td class="py-3 text-on-surface-variant">
+                            {{ label }}
+                            <p class="mono text-[10px] text-on-surface-variant/70">{{ name }}</p>
+                        </td>
+                        <td class="py-3 text-right mono align-top" style="color:{{ '#a8c22f' if ok else '#c98500' }}">
+                            {{ 'nastavený' if ok else 'chýba' }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            <p class="mono text-[10px] text-on-surface-variant mt-3">Zobrazuje sa len to, či je kľúč nastavený – hodnoty sa nikdy nevypisujú.</p>
+        </div>
+
+    </section>
+
+</main>
+{% endblock %}

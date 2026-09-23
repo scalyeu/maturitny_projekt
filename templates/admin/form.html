@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Upraviť účet' if user else 'Nový účet' }} · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+
+    <!-- ── Hlavička ── -->
+    <div class="flex items-end justify-between flex-wrap gap-5 mb-9">
+        <div>
+            <p class="eyebrow mb-2">
+                <a href="{{ url_for('admin_panel.users') }}" class="hover:text-on-surface transition-colors">Používatelia</a>
+                · {{ 'úprava' if user else 'nový účet' }}
+            </p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">
+                {% if user %}<span class="mono normal-case font-medium">{{ user.username }}</span>{% else %}Nový účet{% endif %}
+            </h1>
+        </div>
+        {% if user %}
+        <p class="mono text-[11px] text-on-surface-variant">
+            id {{ user.id }} · {{ user.role_label }} · vytvorený {{ user.created_at.strftime('%d.%m.%Y %H:%M') }}
+        </p>
+        {% endif %}
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-x-14 gap-y-11">
+
+        <!-- ── Údaje účtu ── -->
+        <div class="lg:col-span-7">
+            <div class="rule"><p class="eyebrow">Údaje účtu</p></div>
+            <form method="POST" class="bg-surface-container border border-white/10 p-6 space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="username">Používateľské meno</label>
+                        {% if user %}
+                        <input type="text" id="username" value="{{ form.username }}" disabled>
+                        <p class="mono text-[10px] text-on-surface-variant mt-1.5">Prihlasovacie meno sa nemení – používateľ ho pozná.</p>
+                        {% else %}
+                        <input type="text" id="username" name="username" value="{{ form.username }}" placeholder="napr. jan.novak"
+                               autocomplete="off" autocapitalize="off" spellcheck="false" minlength="3" maxlength="32" required autofocus>
+                        <p class="mono text-[10px] text-on-surface-variant mt-1.5">3–32 znakov: a–z, 0–9, bodka, pomlčka, podčiarkovník</p>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <label for="full_name">Meno a priezvisko</label>
+                        <input type="text" id="full_name" name="full_name" value="{{ form.full_name }}" placeholder="nepovinné" maxlength="120" autocomplete="off">
+                    </div>
+                </div>
+
+                {% if not user %}
+                <div>
+                    <label for="password">Počiatočné heslo</label>
+                    <input type="password" id="password" name="password" autocomplete="new-password" minlength="6" required>
+                    <p class="mono text-[10px] text-on-surface-variant mt-1.5">Aspoň 6 znakov. Odovzdaj ho používateľovi osobne.</p>
+                </div>
+                {% endif %}
+
+                <div>
+                    <p class="eyebrow mb-2">Rola</p>
+                    <div class="grid grid-cols-3 gap-px bg-white/10 border border-white/10">
+                        {% for value, sub in [('zverenec', 'vidí len svoje údaje'), ('trener', 'spravuje zverencov a plán'), ('admin', 'správa účtov a systému')] %}
+                        <label class="bg-surface-container-low px-4 py-3.5 cursor-pointer flex items-start gap-3 hover:bg-surface-container-high transition-colors">
+                            <input type="radio" name="role" value="{{ value }}" class="mt-1" {% if form.role == value %}checked{% endif %}>
+                            <span>
+                                <span class="block font-headline font-bold text-on-surface">{{ ROLE_LABELS[value] }}</span>
+                                <span class="block text-[12px] text-on-surface-variant">{{ sub }}</span>
+                            </span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                    {% if user and user.is_coach %}
+                    <p class="mono text-[10px] text-on-surface-variant mt-2" style="color:#c98500">
+                        Zmena roly z trénera odpojí všetkých jeho zverencov.
+                    </p>
+                    {% endif %}
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="coach_id">Tréner (len pre zverenca)</label>
+                        <select id="coach_id" name="coach_id">
+                            <option value="" {% if not form.coach_id %}selected{% endif %}>— bez trénera —</option>
+                            {% for c in coaches %}
+                            {% if not user or c.id != user.id %}
+                            <option value="{{ c.id }}" {% if form.coach_id|string == c.id|string %}selected{% endif %}>
+                                {{ c.username }}{% if c.full_name %} · {{ c.full_name }}{% endif %}
+                            </option>
+                            {% endif %}
+                            {% endfor %}
+                        </select>
+                        <p class="mono text-[10px] text-on-surface-variant mt-1.5">Priradenie adminom platí ako potvrdený súhlas zverenca.</p>
+                    </div>
+                    <div>
+                        <label for="world_athletics_id">World Athletics ID</label>
+                        <input type="text" id="world_athletics_id" name="world_athletics_id" value="{{ form.world_athletics_id }}"
+                               placeholder="len číslice, nepovinné" inputmode="numeric" maxlength="32" autocomplete="off">
+                    </div>
+                </div>
+
+                <label class="flex items-center gap-3 cursor-pointer normal-case tracking-normal text-[13px] text-on-surface mb-0">
+                    <input type="checkbox" name="must_change_password" value="1" {% if form.must_change_password %}checked{% endif %}>
+                    Pri ďalšom prihlásení si musí zmeniť heslo
+                </label>
+
+                <div class="flex flex-wrap items-center gap-2.5 pt-1">
+                    <button type="submit" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+                        {{ 'Uložiť zmeny' if user else 'Vytvoriť účet' }}
+                    </button>
+                    <a href="{{ url_for('admin_panel.users') }}"
+                       class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">Späť</a>
+                </div>
+            </form>
+        </div>
+
+        {% if user %}
+        <div class="lg:col-span-5 space-y-11">
+
+            <!-- ── Dáta používateľa ── -->
+            <div>
+                <div class="rule"><p class="eyebrow">Dáta v systéme</p></div>
+                <table class="w-full">
+                    <tbody class="text-[13px]">
+                        {% for label, key in [('Tréningy', 'trainings'), ('Výsledky z pretekov', 'results'),
+                                              ('Analýzy videa', 'videos'), ('Analýzy prekážok', 'hurdles'),
+                                              ('Plánované tréningy', 'planned_as_athlete'),
+                                              ('Plán pre zverencov', 'planned_as_coach'),
+                                              ('Biometrika', 'biometrics'), ('AI správy', 'chat'),
+                                              ('Strava tokeny', 'strava'), ('Zverenci', 'athletes')] %}
+                        <tr class="border-b border-white/5">
+                            <td class="py-2.5 text-on-surface-variant">{{ label }}</td>
+                            <td class="py-2.5 text-right mono {{ 'text-on-surface' if data[key] else 'text-on-surface-variant' }}">{{ data[key] }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- ── Reset hesla ── -->
+            <div id="reset-hesla">
+                <div class="rule"><p class="eyebrow">Reset hesla</p></div>
+                <form method="POST" action="{{ url_for('admin_panel.reset_password', user_id=user.id) }}"
+                      class="bg-surface-container border border-white/10 p-6 space-y-4">
+                    <div>
+                        <label for="new_password">Nové dočasné heslo</label>
+                        <input type="text" id="new_password" name="new_password" minlength="6" required
+                               autocomplete="off" spellcheck="false" placeholder="aspoň 6 znakov">
+                        <p class="mono text-[10px] text-on-surface-variant mt-1.5">
+                            Používateľ si ho pri prihlásení musí zmeniť. Staré heslo prestane platiť.
+                        </p>
+                    </div>
+                    <button type="submit"
+                            class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                        Nastaviť heslo
+                    </button>
+                </form>
+            </div>
+
+            <!-- ── Zmazanie ── -->
+            <div>
+                <div class="rule"><p class="eyebrow">Zmazanie účtu</p></div>
+                {% if user.id == current_user.id %}
+                <p class="text-[13px] text-on-surface-variant">Vlastný účet sa nedá zmazať.</p>
+                {% else %}
+                <p class="text-[13px] text-on-surface-variant mb-4">
+                    Zmaže účet aj všetky jeho údaje. Pred zmazaním sa zobrazí potvrdenie so súhrnom.
+                </p>
+                <a href="{{ url_for('admin_panel.delete_user', user_id=user.id) }}"
+                   class="inline-block border border-[#e66767]/50 hover:border-[#e66767] px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Zmazať účet…
+                </a>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</main>
+{% endblock %}

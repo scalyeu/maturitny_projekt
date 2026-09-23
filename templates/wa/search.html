@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}World Athletics · {{ athlete.display_name }} · AtletCoach{% endblock %}
+
+{% block content %}
+<main class="mt-10 pb-12">
+    <div class="mb-8 flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+        <div>
+            <p class="eyebrow mb-2">World Athletics · {{ athlete.display_name }}</p>
+            <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">Import rekordov</h1>
+            <p class="text-[13px] text-on-surface-variant mt-3 leading-relaxed max-w-[60ch]">
+                Vyhľadaj zverenca na worldathletics.org a načítaj jeho osobné rekordy v bežeckých disciplínach.
+                Pred uložením uvidíš náhľad – nič sa neimportuje bez potvrdenia.
+            </p>
+        </div>
+        <a href="{{ url_for('trener.athlete_detail', athlete_id=athlete.id) }}"
+           class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors self-start lg:self-auto">
+            ← Detail zverenca
+        </a>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-x-14 gap-y-10">
+
+        {# ── Vyhľadávanie ── #}
+        <div class="lg:col-span-5">
+            <div class="rule"><p class="eyebrow">Hľadať atléta</p></div>
+            <form method="GET" action="{{ url_for('wa.search_page', athlete_id=athlete.id) }}"
+                  class="bg-surface-container border border-white/10 p-6 space-y-5">
+                <div>
+                    <label for="q">Meno, WA ID alebo URL profilu</label>
+                    <input type="text" id="q" name="q" value="{{ query }}" maxlength="120"
+                           placeholder="napr. Ján Volko alebo 14511687" autocomplete="off" required autofocus>
+                    <p class="mono text-[10px] text-on-surface-variant mt-1.5">
+                        Hľadanie je približné – kontroluj krajinu a rok narodenia. Vložené číslo alebo odkaz
+                        worldathletics.org/athletes/… otvorí náhľad priamo.
+                    </p>
+                </div>
+                <button type="submit" class="w-full bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+                    Hľadať na World Athletics
+                </button>
+            </form>
+
+            {% if athlete.world_athletics_id %}
+            <div class="mt-8">
+                <div class="rule"><p class="eyebrow">Priradený profil</p></div>
+                <div class="bg-surface-container border border-white/10 p-6">
+                    <p class="eyebrow mb-2">World Athletics ID</p>
+                    <p class="mono text-[20px] text-on-surface">{{ athlete.world_athletics_id }}</p>
+                    <p class="text-[13px] text-on-surface-variant mt-2">
+                        Obnovenie načíta aktuálne rekordy z WA a pridá len tie, ktoré ešte nie sú evidované.
+                    </p>
+                    <div class="mt-5 flex flex-wrap gap-2.5">
+                        <form method="POST" action="{{ url_for('wa.refresh', athlete_id=athlete.id) }}">
+                            <button type="submit" class="bg-primary px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em]">
+                                Obnoviť z WA
+                            </button>
+                        </form>
+                        <form method="POST" action="{{ url_for('wa.preview', athlete_id=athlete.id) }}">
+                            <input type="hidden" name="wa_id" value="{{ athlete.world_athletics_id }}">
+                            <button type="submit" class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                                Náhľad
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {# ── Výsledky hľadania ── #}
+        <div class="lg:col-span-7">
+            <div class="rule">
+                <p class="eyebrow">Výsledky hľadania</p>
+                {% if results %}<p class="eyebrow">{{ results|length }} kandidátov</p>{% endif %}
+            </div>
+
+            {% if failed %}
+            <div class="bg-surface-container border border-white/10 border-l-2 border-l-[#c98500] p-6">
+                <p class="font-headline font-bold text-on-surface mb-2">Načítanie z World Athletics zlyhalo</p>
+                <p class="text-[13px] text-on-surface-variant leading-relaxed">
+                    Dôvod je v hlásení hore. Rekordy zverenca môžeš zatiaľ zapísať ručne
+                    v <a href="{{ url_for('trener.athlete_detail', athlete_id=athlete.id) }}"
+                         class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">detaile zverenca</a>
+                    – import ich neskôr doplní bez duplicít. Ak máš odkaz na profil, vlož ho do poľa vľavo;
+                    profil sa potom skúsi prečítať aj bez API kľúča.
+                </p>
+            </div>
+
+            {% elif results is none %}
+            <p class="text-on-surface-variant py-4 text-[13px]">
+                Zadaj meno a klikni na Hľadať. Odporúčame priezvisko bez diakritiky, ak sa meno nenájde.
+            </p>
+
+            {% elif not results %}
+            <div class="bg-surface-container border border-white/10 p-6">
+                <p class="font-headline font-bold text-on-surface mb-2">Nič sa nenašlo</p>
+                <p class="text-[13px] text-on-surface-variant leading-relaxed">
+                    Skús priezvisko bez diakritiky alebo vlož priamo ID či URL profilu z worldathletics.org.
+                    Atléti bez medzinárodných štartov na WA byť nemusia – ich rekordy zapíš ručne
+                    v <a href="{{ url_for('trener.athlete_detail', athlete_id=athlete.id) }}"
+                         class="text-on-surface border-b border-white/25 hover:border-white/60 transition-colors">detaile zverenca</a>.
+                </p>
+            </div>
+
+            {% else %}
+            <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="border-b border-white/10">
+                        <th class="py-2.5 text-left">Meno</th>
+                        <th class="py-2.5 text-left">Krajina</th>
+                        <th class="py-2.5 text-left">Narodený</th>
+                        <th class="py-2.5 text-left">Disciplíny</th>
+                        <th class="py-2.5 text-right"></th>
+                    </tr>
+                </thead>
+                <tbody class="text-[13px]">
+                    {% for r in results %}
+                    <tr class="border-b border-white/5 align-top">
+                        <td class="py-3 pr-4">
+                            <span class="font-headline font-semibold text-on-surface">{{ r.name }}</span>
+                            <span class="block mono text-[10px] text-on-surface-variant mt-0.5">ID {{ r.wa_id }}</span>
+                        </td>
+                        <td class="py-3 pr-4 mono text-on-surface">{{ r.country }}</td>
+                        <td class="py-3 pr-4 mono text-on-surface-variant whitespace-nowrap">{{ r.birth_date_text }}</td>
+                        <td class="py-3 pr-4 text-on-surface-variant">{{ r.disciplines }}</td>
+                        <td class="py-3 text-right whitespace-nowrap">
+                            <form method="POST" action="{{ url_for('wa.preview', athlete_id=athlete.id) }}" class="inline">
+                                <input type="hidden" name="wa_id" value="{{ r.wa_id }}">
+                                <button type="submit"
+                                        class="border border-white/15 hover:border-white/35 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-on-surface transition-colors">
+                                    Importovať
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+            </div>
+            <p class="mono text-[10px] text-on-surface-variant mt-4">
+                Tlačidlo otvorí náhľad rekordov – uložia sa až po potvrdení.
+            </p>
+            {% endif %}
+        </div>
+    </div>
+</main>
+{% endblock %}

@@ -78,8 +78,8 @@ kliknutím do prvého snímku. Pri nízkej snímkovej frekvencii aplikácia výs
 
 ### Prekážky (`/prekazky`)
 
-Nahráš záber s aspoň dvoma prekážkami (stačí bežné video 30 fps, aj záznam z pretekov z tribúny) a aplikácia
-**automaticky** odmeria to, čo tréner bežne stopuje ručne:
+Nahráš jeden nestrihaný záber z boku na jedného bežca s aspoň dvoma prekážkami (stačí bežné video 30 fps, aj
+z tribúny) a aplikácia **automaticky** odmeria to, čo tréner bežne stopuje ručne:
 
 | Veličina | Význam |
 |----------|--------|
@@ -92,6 +92,16 @@ Nahráš záber s aspoň dvoma prekážkami (stačí bežné video 30 fps, aj z�
 Hodnotenie rytmu má vlastné pravidlá (počet krokov, trend a stabilita medzičasov, najpomalší úsek, striedanie
 odrazovej nohy pri 400 m prekážkach). Let nad prekážkou a kontakty v milisekundách sa počítajú a ukladajú, ale
 stránka ich nezobrazuje – bez spomaleného videa sú len orientačné.
+
+Každý nájdený prechod prekážky a každý úsek medzi prekážkami prejde **kontrolou vierohodnosti**: odraz a dopad
+musia byť z rôznych nôh, panva sa počas letu musí zdvihnúť, kostra musí byť pri oboch kontaktoch viditeľná, dve
+prekážky nemôžu byť bližšie než najrýchlejší možný medzičas disciplíny a v úseku nesmie byť diera v sledovaní,
+zamietnutý dlhý let, priveľa či primálo krokov na disciplínu ani krok 1,6× dlhší než medián úseku (vypadnutý
+kontakt). Úsek s neistým počtom krokov dostane namiesto počtu „?“ a do hodnotenia rytmu sa nezapočíta (medzičas
+ostáva, ak je sám vierohodný); úsek s nevierohodným medzičasom vypadne aj z priemerov a rýchlosti. Stránka to
+ohlási pásom nad výsledkom. Video, kde je kostra na menej než polovici snímok v úseku s bežcom (strihaný
+televízny záznam, viac ľudí v zábere), analýza odmietne s vysvetlením, aký záber natočiť; rovnako video, na ktoré
+nesedí zvolená disciplína (prekážky bližšie, než dovoľuje jej najrýchlejší medzičas).
 
 ### Stopky s fotobunkou (`/stopky`)
 
@@ -314,7 +324,9 @@ vlastníka (z verzie pred účtami) vidí len administrátor.
 
 **Prekážky** (`hurdle_analysis.py`) prekážku vo videu nehľadajú ako predmet – prezradí ju beh. Medzi dvoma
 kontaktmi je pri behu let ~0,12 s, pri prechode prekážky 0,3 – 0,5 s. Každý let výrazne dlhší než bežný krok (viac
-než 1,7× medián) je prechod prekážky; kontakt pred ním je odraz, po ňom dopad. Zvyšok (medzičasy, počet krokov,
+než 1,7× medián) je kandidát na prechod prekážky; kandidát ešte prejde kontrolou (odraz a dopad z rôznych nôh,
+zdvih panvy voči odrazu a dopadu, viditeľná kostra, minimálny odstup prekážok). Kontakt pred ním je odraz, po
+ňom dopad. Zvyšok (medzičasy, počet krokov,
 rýchlosť z pravidlami danej vzdialenosti) je aritmetika nad zoznamom kontaktov.
 
 **Presnosť.** Kontakt so zemou pri šprinte trvá okolo 0,11 s; pri 30 fps sú to 3 snímky, čo je menej než rozdiel
@@ -323,7 +335,9 @@ nízkej hodnote výsledok označí ako orientačný. Overenie metódy kostry na 
 kontaktu (`python test_video_analysis.py`): RMS chyba 0,8 ms pri 240 fps, 1,4 ms pri 120 fps, 3,8 ms pri 60 fps,
 25,8 ms pri 30 fps. Optický tok na vykreslenom videu (`python test_optical_flow.py`): všetky kontakty nájdené,
 chyba dĺžky kontaktu do −7,5 ms, aj pri kamere uhýbajúcej za bežcom. Prekážková analýza
-(`python test_hurdle_analysis.py`): všetky prekážky, správny počet krokov, medzičas na ±20 ms pri 30 – 240 fps.
+(`python test_hurdle_analysis.py`): všetky prekážky, správny počet krokov, medzičas na ±20 ms pri 30 – 240 fps;
+vypadnutý kontakt uprostred úseku nevytvorí falošnú prekážku a úsek sa označí ako neúplný (`?-13`); video
+s kostrou na 30 % snímok sa odmietne.
 Tieto čísla platia pre algoritmy; v reálnom videu sa pripočíta chyba rozpoznávania kostry (svetlo, pozadie,
 ostrosť) – práve na to slúži porovnanie oboch metód v aplikácii. Pri prenose videa z iPhonu zachová 240 fps
 **AirDrop originálu**; export „Uložiť ako video“ môže záber prerenderovať na 30 fps a časy vyjdú ~8× dlhšie.
@@ -502,7 +516,9 @@ cez GET. Žiadny test nenašiel čítanie ani zápis cudzích údajov, obídenie
 - **Video** – uhly sa počítajú v rovine obrazu (2D), platia len pri zábere z boku; presnosť kontaktov je zdola
   ohraničená fps; MediaPipe sleduje jedného človeka a pri prekrývaní bežcov môže kostra preskočiť; veľmi nízke
   tréningové prekážky (let kratší než ~0,22 s) sa neodlíšia od kroku; referenčné pásma sú orientačné, nie
-  individuálna norma.
+  individuálna norma. Prekážky potrebujú jeden nestrihaný záber z boku na jedného bežca – strihaný záznam
+  z televízie alebo záber s viacerými bežcami analýza odmietne alebo označí úseky ako neúplné; ak MediaPipe zamení
+  ľavú a pravú nohu presne pri odraze alebo dopade, prekážka sa zamietne a susedný úsek sa ohlási ako neúplný.
 - **Výsledky** – výsledok sa nedá upraviť (len zmazať a pridať znova); vlastné názvy disciplín sa nezjednocujú
   („100 m“ a „100m“ sú dve disciplíny); časy na stotiny.
 - **Plán** – zverenec plán neupravuje ani nemaže; tréner upravuje len plány, ktoré sám vytvoril; intervaly sa
@@ -523,7 +539,7 @@ cez GET. Žiadny test nenašiel čítanie ani zápis cudzích údajov, obídenie
 ```bash
 venv/bin/python -m pytest -q test_world_athletics.py   # 60 testov, offline (HTTP je nahradené)
 python test_video_analysis.py     # kontakt so zemou, mierka, dĺžka kroku, celý reťazec – syntetické dáta
-python test_hurdle_analysis.py    # prekážky: detekcia, kroky medzi prekážkami, medzičasy
+python test_hurdle_analysis.py    # prekážky: detekcia, kroky medzi prekážkami, medzičasy, kontrola vierohodnosti
 python test_optical_flow.py       # optický tok na vykreslenom videu s textúrami
 ```
 

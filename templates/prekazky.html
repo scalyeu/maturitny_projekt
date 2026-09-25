@@ -179,6 +179,13 @@
             <div id="results" class="hidden space-y-5">
                 <div id="accuracy-box" class="rounded-3xl p-5 border"></div>
 
+                <div id="reliability-banner" class="hidden bg-surface-container-high border-l-2 p-5">
+                    <p id="reliability-label" class="eyebrow mb-2"></p>
+                    <p id="reliability-text" class="text-sm"></p>
+                    <ul id="reliability-reasons" class="text-sm text-on-surface-variant mt-2 space-y-1 list-disc pl-5"></ul>
+                    <p id="reliability-hint" class="text-xs text-on-surface-variant mt-3"></p>
+                </div>
+
                 <div id="warnings-box" class="hidden bg-yellow-900/20 border border-yellow-500/20 rounded-3xl p-5">
                     <p class="font-bold text-yellow-300 text-sm mb-2 flex items-center gap-2">
                         <span class="material-symbols-outlined text-base">warning</span> Na čo si dať pozor
@@ -469,8 +476,8 @@
     });
 
     // ── vykreslenie ─────────────────────────────────────────────────
-    function tile(label, value, sub, accent) {
-        return '<div class="bg-surface-container-high rounded-2xl p-4 hover-lift"><p class="text-xs uppercase tracking-wider text-on-surface-variant mb-1">' + label + '</p>' +
+    function tile(label, value, sub, accent, muted) {
+        return '<div class="bg-surface-container-high rounded-2xl p-4 hover-lift' + (muted ? ' opacity-40' : '') + '"><p class="text-xs uppercase tracking-wider text-on-surface-variant mb-1">' + label + '</p>' +
             '<p class="font-headline font-extrabold text-2xl ' + (accent ? 'text-primary' : 'text-on-surface') + '">' + value + '</p>' +
             (sub ? '<p class="text-xs text-on-surface-variant mt-0.5">' + sub + '</p>' : '') + '</div>';
     }
@@ -482,7 +489,7 @@
     };
     function renderTechnique(t) {
         const list = document.getElementById('tech-list'), overall = document.getElementById('tech-overall'), counts = document.getElementById('tech-counts');
-        if (!t || !t.findings || !t.findings.length) { list.innerHTML = ''; overall.textContent = (t && t.error) ? t.error : 'Na hodnotenie treba aspoň dve prekážky v zábere.'; counts.innerHTML = ''; return; }
+        if (!t || !t.findings || !t.findings.length) { list.innerHTML = ''; overall.textContent = (t && t.error) ? t.error : ((t && t.overall) || 'Na hodnotenie treba aspoň dve prekážky v zábere.'); counts.innerHTML = ''; return; }
         overall.textContent = t.overall;
         const c = t.counts || {};
         counts.innerHTML = '<span class="px-2 py-1 rounded-lg bg-red-900/30 text-red-300">' + (c.problem || 0) + ' riešiť</span>' +
@@ -516,25 +523,49 @@
 
         // Medzičasy trvajú sekundy, takže ±1 snímok je aj pri bežnom videu chyba pod 1 %.
         const frameMs = d.accuracy.frame_ms || (1000 / v.fps);
-        const good = v.fps >= 24;
+        // Spoľahlivosť: staré uložené výsledky pole nemajú – berú sa ako v poriadku.
+        const rel = d.reliability || { level: 'ok', reasons: [] };
+        const unreliable = rel.level === 'low' || rel.level === 'unusable';
+        const good = v.fps >= 24 && !unreliable;
         const box = document.getElementById('accuracy-box');
         box.className = 'rounded-3xl p-5 border ' + (good ? 'bg-green-900/20 border-green-500/20' : 'bg-yellow-900/20 border-yellow-500/20');
         box.innerHTML = '<div class="flex items-start gap-3"><span class="material-symbols-outlined ' + (good ? 'text-green-400' : 'text-yellow-400') + '">' + (good ? 'verified' : 'error') + '</span><div>' +
             '<p class="font-bold text-sm ' + (good ? 'text-green-300' : 'text-yellow-300') + '">' + esc(s.discipline_label) + ' · ' + s.hurdles_detected + ' prekáž' + (s.hurdles_detected === 1 ? 'ka' : (s.hurdles_detected < 5 ? 'ky' : 'ok')) +
-            ' v zábere · medzičasy presné na ± ' + Math.round(frameMs) + ' ms (1 snímok)</p>' +
+            (unreliable ? ' v zábere · rozlíšenie ± ' : ' v zábere · medzičasy presné na ± ') + Math.round(frameMs) + ' ms (1 snímok)</p>' +
             '<p class="text-xs text-on-surface-variant mt-2">Video: ' + v.fps + ' fps · ' + v.duration_s + ' s · ' + v.width + '×' + v.height + ' · kostra rozpoznaná na ' + Math.round(v.detected_ratio * 100) + ' % snímok' +
             (v.crop_ratio ? ' · bežec priblížený na ' + Math.round(v.crop_ratio * 100) + ' % snímok' : '') + '</p></div></div>';
 
+        const rBox = document.getElementById('reliability-banner');
+        rBox.classList.toggle('hidden', !unreliable);
+        if (unreliable) {
+            const bad = rel.level === 'unusable';
+            rBox.className = 'bg-surface-container-high border-l-2 p-5 ' + (bad ? 'border-red-400' : 'border-primary');
+            const lab = document.getElementById('reliability-label');
+            lab.textContent = bad ? 'Z tohto videa sa rytmus nedá určiť' : 'Výsledok je nespoľahlivý';
+            lab.className = 'eyebrow mb-2 ' + (bad ? '!text-red-300' : '!text-primary');
+            document.getElementById('reliability-text').textContent = bad
+                ? 'Čísla nižšie neber ako meranie. Úseky, ktoré neprešli kontrolou, majú namiesto počtu krokov „?“ a nezapočítavajú sa do priemerov.'
+                : 'Časť úsekov neprešla kontrolou vierohodnosti. Tie majú namiesto počtu krokov „?“ a nezapočítavajú sa do priemerov ani do hodnotenia.';
+            document.getElementById('reliability-reasons').innerHTML = (rel.reasons || []).map(r => '<li>' + esc(r) + '</li>').join('');
+            document.getElementById('reliability-hint').textContent = 'Najlepšie funguje jeden nestrihaný záber z boku na jedného bežca: telefón kolmo na dráhu, bežec celý v obraze, aspoň dve prekážky s krokmi pred nimi aj za nimi.';
+        }
         const wBox = document.getElementById('warnings-box'), wList = document.getElementById('warnings-list');
         if (d.warnings && d.warnings.length) { wBox.classList.remove('hidden'); wList.innerHTML = d.warnings.map(w => '<li>' + esc(w) + '</li>').join(''); }
         else wBox.classList.add('hidden');
 
         const sidesTxt = s.takeoff_left + '× ľavá, ' + s.takeoff_right + '× pravá';
+        const ivTotal = s.intervals_total !== undefined ? s.intervals_total : (d.intervals || []).length;
+        const ivValid = s.intervals_valid !== undefined ? s.intervals_valid : ivTotal;
+        const ivSteps = s.intervals_steps_valid !== undefined ? s.intervals_steps_valid : ivTotal;
+        const oneHurdle = ivTotal === 0;
+        const noTimes = oneHurdle || ivValid === 0, noSteps = oneHurdle || ivSteps === 0;
+        const muteSub = oneHurdle ? 'len jedna prekážka' : 'neúplný záznam';
+        const stepsSub = noSteps ? muteSub : (ivSteps < ivTotal ? ivSteps + ' z ' + ivTotal + ' úsekov úplných · ? = neúplný' : 'rytmus');
         document.getElementById('stat-grid').innerHTML = [
-            tile('Medzičas', s.interval_mean_s !== null ? fmt(s.interval_mean_s, ' s', 2) : '—', s.interval_sd_s !== null ? '± ' + fmt(s.interval_sd_s, ' s', 2) + ' medzi úsekmi' : 'dopad → dopad', true),
-            tile('Kroky medzi prekážkami', s.steps_pattern_text || '—', 'rytmus'),
-            tile('Rýchlosť medzi prekážkami', s.speed_between_ms_mean !== null ? fmt(s.speed_between_ms_mean, ' m/s', 2) : '—', s.speed_between_kmh_mean !== null ? fmt(s.speed_between_kmh_mean, ' km/h', 1) + ' · z ' + s.spacing_m + ' m' : 'zvoľ disciplínu'),
-            tile('Zmena medzičasu', s.interval_trend_pct !== null && s.interval_trend_pct !== undefined ? (s.interval_trend_pct > 0 ? '+' : '') + fmt(s.interval_trend_pct, ' %', 1) : '—', 'prvý → posledný úsek'),
+            tile('Medzičas', s.interval_mean_s !== null ? fmt(s.interval_mean_s, ' s', 2) : '—', noTimes ? muteSub : (s.interval_sd_s !== null ? '± ' + fmt(s.interval_sd_s, ' s', 2) + ' medzi úsekmi' : 'dopad → dopad'), true, noTimes),
+            tile('Kroky medzi prekážkami', s.steps_pattern_text || '—', stepsSub, false, noSteps),
+            tile('Rýchlosť medzi prekážkami', s.speed_between_ms_mean !== null ? fmt(s.speed_between_ms_mean, ' m/s', 2) : '—', noTimes ? muteSub : (s.speed_between_kmh_mean !== null ? fmt(s.speed_between_kmh_mean, ' km/h', 1) + ' · z ' + s.spacing_m + ' m' : 'zvoľ disciplínu'), false, noTimes),
+            tile('Zmena medzičasu', s.interval_trend_pct !== null && s.interval_trend_pct !== undefined ? (s.interval_trend_pct > 0 ? '+' : '') + fmt(s.interval_trend_pct, ' %', 1) : '—', noTimes ? muteSub : 'prvý → posledný úsek', false, noTimes),
             tile('Odrazová noha', 'Ľ ' + s.takeoff_left + ' · P ' + s.takeoff_right, sidesTxt + (s.takeoff_left && s.takeoff_right ? ' · strieda obe' : ' · stále tá istá')),
             tile('Prekážok v zábere', fmt(s.hurdles_detected, ''), s.contacts_detected + ' krokov celkom'),
         ].join('');
@@ -545,16 +576,18 @@
         (d.hurdles || []).forEach(h => { hurdleOf[h.index] = h; });
         document.getElementById('interval-table').innerHTML = (d.intervals || []).map(iv => {
             const h2 = hurdleOf[iv.to_hurdle] || {};
-            return '<tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold">P' + iv.from_hurdle + ' → P' + iv.to_hurdle + '</td>' +
-            '<td class="py-2 pr-4 text-right font-bold text-primary">' + fmt(iv.interval_s, ' s', 2) + '</td>' +
-            '<td class="py-2 pr-4 text-right">' + iv.steps_between + '</td>' +
-            '<td class="py-2 pr-4 text-right">' + (iv.speed_ms ? fmt(iv.speed_ms, ' m/s', 2) : '—') + '</td>' +
+            const ivOk = iv.valid !== false, stOk = iv.steps_valid !== false && iv.steps_between !== null && iv.steps_between !== undefined;
+            const why = iv.invalid_reason ? ' title="' + esc(iv.invalid_reason) + '"' : '';
+            return '<tr class="border-b border-white/5' + (ivOk ? '' : ' text-on-surface-variant') + '"' + why + '><td class="py-2 pr-4 font-semibold">P' + iv.from_hurdle + ' → P' + iv.to_hurdle + '</td>' +
+            '<td class="py-2 pr-4 text-right font-bold ' + (ivOk ? 'text-primary' : 'line-through') + '">' + fmt(iv.interval_s, ' s', 2) + '</td>' +
+            '<td class="py-2 pr-4 text-right">' + (stOk ? iv.steps_between : '<span class="text-on-surface-variant">? neúplný</span>') + '</td>' +
+            '<td class="py-2 pr-4 text-right">' + (ivOk && iv.speed_ms ? fmt(iv.speed_ms, ' m/s', 2) : '—') + '</td>' +
             '<td class="py-2 pl-4">' + (h2.takeoff_side ? sideBadge(h2.takeoff_side) : '—') + '</td></tr>';
         }).join('') || '<tr><td colspan="5" class="py-2 text-on-surface-variant">Na medzičas treba aspoň dve prekážky v zábere.</td></tr>';
 
         // dopady za prekážkami
         const stepsBefore = {};
-        (d.intervals || []).forEach(iv => { stepsBefore[iv.to_hurdle] = iv.steps_between; });
+        (d.intervals || []).forEach(iv => { stepsBefore[iv.to_hurdle] = (iv.steps_valid !== false && iv.steps_between !== null && iv.steps_between !== undefined) ? iv.steps_between : '?'; });
         document.getElementById('hurdle-table').innerHTML = (d.hurdles || []).map((h, i) =>
             '<tr class="border-b border-white/5"><td class="py-2 pr-4 font-semibold">P' + h.index + '</td>' +
             '<td class="py-2 pr-4">' + sideBadge(h.takeoff_side) + '</td>' +
@@ -585,13 +618,13 @@
         const labels = intervals.map(iv => 'P' + iv.from_hurdle + '→P' + iv.to_hurdle);
         chart = new Chart(ctx, {
             type: 'bar',
-            data: { labels, datasets: [{ label: 'Medzičas (s)', data: intervals.map(iv => iv.interval_s), backgroundColor: '#879c26', borderRadius: 4, maxBarThickness: 70 }] },
+            data: { labels, datasets: [{ label: 'Medzičas (s)', data: intervals.map(iv => iv.interval_s), backgroundColor: intervals.map(iv => iv.valid === false ? '#3a3a3d' : '#879c26'), borderRadius: 0, maxBarThickness: 70 }] },
             options: {
                 responsive: true, maintainAspectRatio: false,
                 layout: { padding: { top: 26 } },
                 plugins: {
                     legend: { display: false },
-                    tooltip: { callbacks: { afterBody: items => { const iv = intervals[items[0].dataIndex]; return ['Kroky: ' + iv.steps_between, iv.speed_ms ? 'Rýchlosť: ' + iv.speed_ms + ' m/s' : '']; } } },
+                    tooltip: { callbacks: { afterBody: items => { const iv = intervals[items[0].dataIndex]; const stOk = iv.steps_valid !== false && iv.steps_between !== null && iv.steps_between !== undefined; return [stOk ? 'Kroky: ' + iv.steps_between : 'Kroky: ? – ' + (iv.invalid_reason || 'neúplný záznam'), iv.valid !== false && iv.speed_ms ? 'Rýchlosť: ' + iv.speed_ms + ' m/s' : '']; } } },
                 },
                 scales: {
                     x: { ticks: { color: '#8b8b84', font: { size: 11 } }, grid: { display: false } },
@@ -601,7 +634,7 @@
                     const ch = (anim && anim.chart) || chart;
                     if (!ch) return;
                     const c = ch.ctx; c.save(); c.font = 'bold 12px Archivo, sans-serif'; c.fillStyle = '#ece9e3'; c.textAlign = 'center';
-                    ch.getDatasetMeta(0).data.forEach((bar, i) => { c.fillText(intervals[i].steps_between + ' krokov', bar.x, bar.y - 6); });
+                    ch.getDatasetMeta(0).data.forEach((bar, i) => { const iv = intervals[i]; const stOk = iv.steps_valid !== false && iv.steps_between !== null && iv.steps_between !== undefined; c.fillText(stOk ? iv.steps_between + ' krokov' : '?', bar.x, bar.y - 6); });
                     c.restore();
                 } },
             },

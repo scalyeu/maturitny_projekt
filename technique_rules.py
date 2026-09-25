@@ -373,9 +373,19 @@ def hurdle_feedback(result: Dict[str, Any]) -> Dict[str, Any]:
 
     if not hurdles:
         return {"findings": [], "overall": "Vo videu sa nenašla žiadna prekážka.", "counts": {}}
+    rel = result.get("reliability") or {}
+    if rel.get("level") == "unusable" and len(hurdles) >= 2:
+        why = "; ".join(rel.get("reasons") or [])
+        return {"findings": [], "counts": {},
+                "overall": "Záznam nie je spoľahlivý, rytmus sa nehodnotí" + (f" ({why})." if why else ".")}
+
+    # Hodnotí sa len z úsekov, ktoré prešli kontrolou vierohodnosti
+    # (staršie uložené výsledky polia `valid` nemajú – berú sa ako platné).
+    step_ivs = [iv for iv in intervals if iv.get("steps_valid", True) and iv.get("steps_between")]
+    time_ivs = [iv for iv in intervals if iv.get("valid", True) and iv.get("interval_s")]
 
     # --- 1. počet krokov medzi prekážkami ---------------------------------
-    counts = [iv.get("steps_between") for iv in intervals if iv.get("steps_between")]
+    counts = [iv["steps_between"] for iv in step_ivs]
     if counts:
         pattern = "-".join(str(c) for c in counts)
         if long_race:
@@ -403,7 +413,7 @@ def hurdle_feedback(result: Dict[str, Any]) -> Dict[str, Any]:
         findings.append(_finding("steps_between", "Kroky medzi prekážkami", st, None, "", ref, txt, tip))
 
     # --- 2. medzičasy: trend a stabilita -----------------------------------
-    times = [iv.get("interval_s") for iv in intervals if iv.get("interval_s")]
+    times = [iv["interval_s"] for iv in time_ivs]
     if len(times) >= 2:
         first, last = times[0], times[-1]
         change = (last - first) / first * 100
@@ -436,7 +446,7 @@ def hurdle_feedback(result: Dict[str, Any]) -> Dict[str, Any]:
         mean_t = float(np.mean(times))
         worst_i = int(np.argmax(times))
         worst = times[worst_i]
-        iv = intervals[worst_i]
+        iv = time_ivs[worst_i]
         dev = (worst - mean_t) / mean_t * 100
         ref = "žiadny úsek viac než 5 % nad priemerom"
         if dev <= 5:
@@ -467,9 +477,11 @@ def hurdle_feedback(result: Dict[str, Any]) -> Dict[str, Any]:
     n_watch = sum(1 for f in findings if f["status"] == WATCH)
     n_ok = sum(1 for f in findings if f["status"] == OK)
     if not findings:
-        overall = "Na hodnotenie rytmu treba aspoň dve prekážky v zábere."
+        overall = ("Na hodnotenie rytmu treba aspoň dve prekážky v zábere." if len(hurdles) < 2
+                   else "Žiadny úsek medzi prekážkami nie je úplný, rytmus sa nedá hodnotiť.")
     elif n_bad == 0 and n_watch == 0:
-        overall = "Rytmus medzi prekážkami je čistý – kroky aj medzičasy držia."
+        overall = ("Rytmus medzi prekážkami je čistý – kroky aj medzičasy držia." if counts
+                   else "Medzičasy držia; počet krokov sa z tohto záznamu nedal určiť.")
     else:
         top = [f["label"].lower() for f in findings if f["status"] == BAD][:2] or \
               [f["label"].lower() for f in findings if f["status"] == WATCH][:2]

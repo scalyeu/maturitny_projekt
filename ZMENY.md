@@ -1,3 +1,49 @@
+# Zmeny „prekážky – kontrola vierohodnosti“ (september 2026)
+
+Podnet: televízny zostrih finále 400 m prekážok (92 s, strihy, osem bežkýň, kostra na 45 % snímok)
+dal rytmus 13-3-5-5-4-8-3 – trinástka bola náhoda cez 22-sekundový úsek s dierami v sledovaní,
+ďalšie „prekážky“ boli obyčajné kroky s vypadnutým kontaktom. Rovnaká chyba (jeden vypadnutý
+kontakt → falošná prekážka, 13 sa rozpadne na 8-3) hrozila aj na dobrom videu.
+
+## `hurdle_analysis.py`
+- Kandidát na prekážku (dlhý let) prejde kontrolou: odraz a dopad z rôznych nôh, dôvera kostry pri
+  oboch kontaktoch ≥ 0,30, zdvih panvy 0,10 – 1,2 trupu. Zdvih sa meria voči výške panvy počas
+  odrazu a dopadu (nie voči 0,8 s vyhladenej referencii, ktorá pohltila polovicu zdvihu): skutočná
+  prekážka dá ~0,25 – 0,6, bežný krok s vypadnutým kontaktom ~0,03 – 0,15. Dve prekážky nemôžu byť
+  bližšie než najrýchlejší medzičas disciplíny (400 m: 3,2 s, 110 m: 0,85 s, 100 m: 0,80 s, iné:
+  0,5 s – prejde aj 1-krokový dril) – z bližšej dvojice ostane vierohodnejšia. Zamietnuté lety sú
+  v `rejected` a v upozornení s dôvodmi. Keď pravidlo „príliš blízko“ zahodí viac prechodov, než
+  ostane (110 m analyzované ako 400 m), analýza video odmietne s vysvetlením, že disciplína nesedí.
+- Každý úsek medzi prekážkami má `valid` (medzičas a rýchlosť použiteľné: žiadna medzera nad 0,9 s,
+  medzičas v rozsahu disciplíny 3,2 – 9,5 s / 0,85 – 2,5 s / 0,80 – 2,5 s, najviac 19 / 4 / 4 krokov,
+  žiadny zamietnutý prechod so zdvihom panvy vnútri úseku – inak úsek spája dva medzičasy) a
+  `steps_valid` (aj počet krokov: žiadny krok pod 130 ms ani 1,6× dlhší než medián úseku, žiadny
+  zamietnutý dlhý let vnútri úseku, najmenej 11 / 3 / 3 krokov). Pre neúplný úsek je `steps_between`
+  `None` (surová hodnota v `steps_between_raw`), v rytme je „?“; priemery, trend, rýchlosť a
+  hodnotenie techniky berú len platné úseky.
+- Video s kostrou na menej než 50 % snímok v úseku od prvého po posledný nájdený snímok
+  (`video.detected_span_ratio`; prázdny rozbeh a dobeh sa nepočítajú) sa odmietne s návodom, aký
+  záber natočiť.
+- Nové pole `reliability` (`ok` / `low` / `unusable` + dôvody) a v súhrne `intervals_total`,
+  `intervals_valid`, `intervals_steps_valid`, `rejected_candidates`.
+
+## Stránka `/prekazky`, hodnotenie, AI tréner
+- Pás nad výsledkom pri nespoľahlivom (volt) alebo nepoužiteľnom (červená linka) výsledku
+  s dôvodmi a návodom na záber; dlaždice bez platných úsekov stlmené; v tabuľke a grafe „?“
+  a sivý stĺpec pre neúplný úsek, dôvod po nabehnutí myšou.
+- `technique_rules.hurdle_feedback` hodnotí len platné úseky; pri nepoužiteľnom zázname sa rytmus
+  nehodnotí. Kontext pre AI trénera dostane varovanie a neúplné úseky označené.
+- Staré uložené výsledky bez nových polí sa berú ako platné a vykreslia sa ako doteraz.
+
+## Testy
+- `test_hurdle_analysis.py`: vypadnutý kontakt uprostred 13-krokového úseku (bez kontrol by vznikla
+  4. prekážka a rytmus 8-3; teraz 3 prekážky, rytmus `?-13`, spoľahlivosť `low`, zamietnutý let
+  v upozornení); to isté na 110 m (`3-?-3-3`, nie „3-2-3-3“); prekážka bez dopadu / so zamenenými
+  nohami na 400 m (zlúčený 7 s úsek je neplatný, nejde do priemeru); 3-krokový rytmus analyzovaný
+  ako 400 m sa odmietne; 1-krokový dril pri „iné“ nájde 6/6 prekážok; brány dôvery kostry,
+  nereálneho zdvihu a minimálneho odstupu (obe vetvy); odmietnutie videa s kostrou na 40 % snímok
+  v úseku s bežcom.
+
 # Zmeny vo verzii „video 2“
 
 ## Oprava dĺžky kroku (30 cm)

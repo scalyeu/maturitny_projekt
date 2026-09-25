@@ -2156,10 +2156,19 @@ def _coach_context(kind, data):
                        ('speed_between_ms_mean', 'rýchlosť medzi prekážkami (m/s)')):
             if s.get(k) is not None:
                 lines.append(f"- {lab}: {s[k]}")
+        rel = data.get('reliability') or {}
+        if rel.get('level') in ('low', 'unusable'):
+            lines.append("POZOR: výsledok je " + ("nepoužiteľný" if rel['level'] == 'unusable' else "nespoľahlivý")
+                         + " (" + "; ".join(rel.get('reasons') or []) + "). Neúplné úseky nehodnoť.")
         for iv in data.get('intervals') or []:
-            lines.append(f"- úsek P{iv['from_hurdle']}→P{iv['to_hurdle']}: medzičas {iv.get('interval_s')} s, "
-                         f"{iv.get('steps_between')} krokov"
-                         + (f", rýchlosť {iv.get('speed_ms')} m/s" if iv.get('speed_ms') else ""))
+            if iv.get('valid', True):
+                txt = f"medzičas {iv.get('interval_s')} s, "
+                txt += (f"{iv['steps_between']} krokov" if iv.get('steps_between') is not None
+                        else "počet krokov neistý")
+                txt += f", rýchlosť {iv.get('speed_ms')} m/s" if iv.get('speed_ms') else ""
+            else:
+                txt = f"neúplný záznam ({iv.get('invalid_reason')})"
+            lines.append(f"- úsek P{iv['from_hurdle']}→P{iv['to_hurdle']}: {txt}")
         for h in data.get('hurdles') or []:
             lines.append(f"- prekážka {h['index']}: odraz z {h.get('takeoff_side_text')} nohy, "
                          f"dopad za prekážkou v čase {h.get('landing_s')} s videa")

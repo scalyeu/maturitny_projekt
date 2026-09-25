@@ -10,6 +10,10 @@ s prechodmi prekážok (odraz 120 ms, let 400 ms, dopad 140 ms) v rytme
 či algoritmus nájde všetky prekážky, správny počet krokov medzi nimi,
 medzičasy a letové časy.
 
+Okrem čistých klipov sa skúša aj to, čo sa na skutočnom videu stáva: vypadnutý
+kontakt uprostred úseku (nesmie vzniknúť falošná prekážka, úsek sa označí ako
+neúplný) a video, kde kostra takmer nie je (analýza ho musí odmietnuť).
+
 Spustenie:   python test_hurdle_analysis.py
 """
 
@@ -162,6 +166,254 @@ def run_case(fps, steps_between, n_hurdles, label, noise=0.0, panning=False):
             "fl_err": float(np.mean(np.abs(fl_err))) if fl_err else float("nan")}
 
 
+def missed_contact_case(fps=120, drop_step=9):
+    """
+    Z čistého 13-krokového úseku sa vymaže jeden bežný kontakt.  Vznikne let
+    ~350 ms, ktorý je dlhší než prah – bez ďalších kontrol by z neho bola
+    „prekážka“ a rytmus 13 by sa rozpadol na 8-3.  Kontroly (rovnaká noha,
+    žiadny zdvih panvy) ho musia zamietnuť.
+    """
+    events = build_events(13, 3)
+    P, V, _ = synth_from_events(fps, events)
+    sig = va.build_signals(P, V, fps)
+    contacts = va.detect_contacts(sig, "L", fps) + va.detect_contacts(sig, "R", fps)
+    contacts = ha.dedupe_contacts(contacts)
+    first_land = next(e["td"] for e in events if e["role"] == "landing")
+    runs_after = [e for e in events if e["role"] == "run" and e["td"] > first_land]
+    t_drop = runs_after[drop_step - 1]["td"]
+    contacts = [c for c in contacts if abs(c["td_time"] - t_drop) > 0.05]
+
+    rejected = []
+    flights = ha.find_hurdle_flights(contacts, sig, fps, min_sep_s=3.2, rejected=rejected)
+    steps = [flights[k + 1]["i_takeoff"] - flights[k]["i_landing"] for k in range(len(flights) - 1)]
+    print(f"  vymazaný kontakt v t={t_drop:.2f} s: prekážok {len(flights)}, surové kroky {steps}, "
+          f"zamietnuté lety: "
+          + "; ".join(f"t={r['t_s']} s ({', '.join(r['reasons'])})" for r in rejected))
+    return {"found": len(flights), "steps": steps, "rejected": rejected, "t_drop": t_drop}
+
+
+def _stub_landmarks(P, V, w, h, ratio=1.0):
+    n = P.shape[0]
+    return lambda path, progress_cb=None, **kw: {
+        "points": P, "visibility": V, "width": w, "height": h,
+        "n_frames": n, "detected_ratio": ratio, "work_scale": 0.5, "crop_ratio": 0.0,
+    }
+
+
+def _blank_video(path, n, fps, w=640, h=480):
+    import cv2
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
+    for _ in range(n):
+        writer.write(np.full((h, w, 3), 30, dtype=np.uint8))
+    writer.release()
+
+
+def end_to_end_missed_contact():
+    """
+    Celý reťazec s vypadnutým kontaktom v prvom úseku: prekážky ostanú tri,
+    prvý úsek sa označí ako neúplný („?“), druhý má 13, hodnotenie ostane.
+    """
+    import os
+    fps = 120
+    events = build_events(13, 3)
+    P, V, _ = synth_from_events(fps, events)
+    n = P.shape[0]
+    tmp_in = "/tmp/_synth_hurdles_missed.mp4"
+    _blank_video(tmp_in, n, fps)
+    first_land = next(e["td"] for e in events if e["role"] == "landing")
+    t_drop = [e for e in events if e["role"] == "run" and e["td"] > first_land][8]["td"]
+
+    orig_lm, orig_dd = va.extract_landmarks, ha.dedupe_contacts
+    va.extract_landmarks = _stub_landmarks(P, V, 640, 480)
+    ha.dedupe_contacts = lambda c: [x for x in orig_dd(c) if abs(x["td_time"] - t_drop) > 0.05]
+    try:
+        res = ha.analyze_hurdle_video(tmp_in, discipline="400mH", real_fps=fps)
+    finally:
+        va.extract_landmarks, ha.dedupe_contacts = orig_lm, orig_dd
+        try:
+            os.remove(tmp_in)
+        except OSError:
+            pass
+    s = res["summary"]
+    print(f"  prekážok: {s['hurdles_detected']}, rytmus {s['steps_pattern_text']}, "
+          f"úplných úsekov {s['intervals_steps_valid']}/{s['intervals_total']}, "
+          f"zamietnutých kandidátov {s['rejected_candidates']}, spoľahlivosť {res['reliability']}")
+    for iv in res["intervals"]:
+        print(f"    P{iv['from_hurdle']}→P{iv['to_hurdle']}: {iv['interval_s']} s, kroky "
+              f"{iv['steps_between']} (surové {iv['steps_between_raw']}), {iv['invalid_reason'] or 'ok'}")
+    return res
+
+
+def refuse_low_detection():
+    """
+    Kostra chýba na 60 % snímok uprostred úseku, kde bežec je (40 % nájdených)
+    – analýza musí video odmietnuť s vysvetlením.  Prázdny rozbeh a dobeh sa
+    nepočítajú, preto sa diera vkladá dovnútra, nie na okraje.
+    """
+    import os
+    fps = 60
+    events = build_events(13, 2)
+    P, V, _ = synth_from_events(fps, events)
+    n = P.shape[0]
+    P[int(0.2 * n):int(0.8 * n)] = np.nan
+    tmp_in = "/tmp/_synth_hurdles_lowratio.mp4"
+    _blank_video(tmp_in, n, fps)
+    orig = va.extract_landmarks
+    va.extract_landmarks = _stub_landmarks(P, V, 640, 480, ratio=0.40)
+    msg = None
+    try:
+        ha.analyze_hurdle_video(tmp_in, discipline="400mH", real_fps=fps)
+    except va.VideoAnalysisError as e:
+        msg = str(e)
+    finally:
+        va.extract_landmarks = orig
+        try:
+            os.remove(tmp_in)
+        except OSError:
+            pass
+    print(f"  správa: {msg}")
+    return msg
+
+
+def _run_full(events, fps, discipline, drop_times=(), flip_side_at=None):
+    """analyze_hurdle_video() na syntetickej kostre; vymaže kontakty v drop_times (s)."""
+    import os
+    P, V, _ = synth_from_events(fps, events)
+    tmp_in = "/tmp/_synth_hurdles_case.mp4"
+    _blank_video(tmp_in, P.shape[0], fps)
+    orig_lm, orig_dd = va.extract_landmarks, ha.dedupe_contacts
+
+    def dedupe(c):
+        out = [x for x in orig_dd(c) if all(abs(x["td_time"] - t) > 0.05 for t in drop_times)]
+        if flip_side_at is not None:
+            for x in out:
+                if abs(x["td_time"] - flip_side_at) <= 0.05:
+                    x["side"] = "L" if x["side"] == "R" else "R"
+        return out
+
+    va.extract_landmarks = _stub_landmarks(P, V, 640, 480)
+    ha.dedupe_contacts = dedupe
+    try:
+        return ha.analyze_hurdle_video(tmp_in, discipline=discipline, real_fps=fps)
+    finally:
+        va.extract_landmarks, ha.dedupe_contacts = orig_lm, orig_dd
+        try:
+            os.remove(tmp_in)
+        except OSError:
+            pass
+
+
+def sprint_missed_contact():
+    """110 m: vypadnutý kontakt v úseku s 3 krokmi – nesmie vyjsť „3-2-3-3“ ako platné."""
+    events = build_events(3, 5)
+    land2 = [e["td"] for e in events if e["role"] == "landing"][1]
+    t_drop = next(e["td"] for e in events if e["role"] == "run" and e["td"] > land2)
+    res = _run_full(events, 240, "110mH", drop_times=(t_drop,))
+    s = res["summary"]
+    print(f"  110 m bez jedného kontaktu: rytmus {s['steps_pattern_text']}, spoľahlivosť {res['reliability']['level']}, "
+          f"hodnotenie: {res['technique']['overall']}")
+    return res
+
+
+def swallowed_hurdle():
+    """
+    400 m: dopad za 2. prekážkou sa nenašiel (alebo MediaPipe zamenil nohy).
+    Prekážka sa právom zamietne, ale zlúčený 7-sekundový úsek nesmie prejsť
+    ako platný medzičas s rýchlosťou.
+    """
+    events = build_events(13, 3)
+    land2 = [e["td"] for e in events if e["role"] == "landing"][1]
+    out = {}
+    for label, kw in (("vypadnutý dopad", {"drop_times": (land2,)}), ("zámena nôh", {"flip_side_at": land2})):
+        res = _run_full(events, 120, "400mH", **kw)
+        iv = res["intervals"][0] if res["intervals"] else None
+        print(f"  {label}: prekážok {res['summary']['hurdles_detected']}, úsek "
+              f"{iv['interval_s'] if iv else None} s valid={iv['valid'] if iv else None} "
+              f"({iv['invalid_reason'] if iv else ''}), medzičas v súhrne {res['summary']['interval_mean_s']}, "
+              f"spoľahlivosť {res['reliability']['level']}")
+        out[label] = res
+    return out
+
+
+def wrong_discipline():
+    """Video s 3-krokovým rytmom analyzované ako 400 m – analýza to musí povedať."""
+    events = build_events(3, 8)
+    msg = None
+    try:
+        _run_full(events, 120, "400mH")
+    except va.VideoAnalysisError as e:
+        msg = str(e)
+    print(f"  správa: {msg}")
+    return msg
+
+
+def one_stride_drill():
+    """Tréning „iné“: 1-krokový rytmus cez nízke prekážky – odstup dopadov ~0,6 s musí prejsť."""
+    fps = 120
+    events = build_events(1, 6)
+    P, V, _ = synth_from_events(fps, events)
+    sig = va.build_signals(P, V, fps)
+    contacts = ha.dedupe_contacts(va.detect_contacts(sig, "L", fps) + va.detect_contacts(sig, "R", fps))
+    rejected = []
+    flights = ha.find_hurdle_flights(contacts, sig, fps, min_sep_s=ha.MIN_HURDLE_SEP_OTHER_S, rejected=rejected)
+    steps = [flights[k + 1]["i_takeoff"] - flights[k]["i_landing"] for k in range(len(flights) - 1)]
+    print(f"  1-krokový dril: prekážky {len(flights)}/6, kroky {steps}, zamietnuté {len(rejected)}")
+    return {"found": len(flights), "steps": steps}
+
+
+def gate_cases():
+    """Brány dôvery kostry, nereálneho zdvihu a minimálneho odstupu (obe vetvy)."""
+    import copy
+    fps = 120
+    events = build_events(13, 3)
+    P, V, _ = synth_from_events(fps, events)
+    sig = va.build_signals(P, V, fps)
+    contacts = ha.dedupe_contacts(va.detect_contacts(sig, "L", fps) + va.detect_contacts(sig, "R", fps))
+    base = ha.find_hurdle_flights(contacts, sig, fps)
+    rises = [f["hip_rise_torso"] for f in base]
+    out = {"base": len(base), "rises": rises}
+
+    # a) nízka dôvera kostry pri dopade 2. prekážky
+    c2 = copy.deepcopy(contacts)
+    c2[base[1]["i_landing"]]["confidence"] = 0.1
+    rej = []
+    fl = ha.find_hurdle_flights(c2, sig, fps, rejected=rej)
+    out["conf"] = (len(fl), [r for rj in rej for r in rj["reasons"]])
+
+    # b) nereálny zdvih panvy – kostra „preskočila“ počas letu 2. prekážky
+    sig2 = dict(sig)
+    sig2["hip"] = sig["hip"].copy()
+    lo = int(contacts[base[1]["i_takeoff"]]["to_frame"]) + 1
+    hi = int(contacts[base[1]["i_landing"]]["td_frame"])
+    sig2["hip"][lo:hi, 1] -= 1.5 * sig["torso_ref"]
+    rej = []
+    fl = ha.find_hurdle_flights(contacts, sig2, fps, rejected=rej)
+    out["rise"] = (len(fl), [r for rj in rej for r in rj["reasons"]])
+
+    # c) minimálny odstup: 3-krokový rytmus s prahom 3,2 s – ostane vždy len jedna z blízkych dvojíc
+    ev3 = build_events(3, 3)
+    P3, V3, _ = synth_from_events(fps, ev3)
+    sig3 = va.build_signals(P3, V3, fps)
+    c3 = ha.dedupe_contacts(va.detect_contacts(sig3, "L", fps) + va.detect_contacts(sig3, "R", fps))
+    all3 = ha.find_hurdle_flights(c3, sig3, fps)
+    rej = []
+    fl = ha.find_hurdle_flights(c3, sig3, fps, min_sep_s=3.2, rejected=rej)
+    out["sep_prev"] = (len(fl), [r for rj in rej for r in rj["reasons"]])
+    # d) keď je prvá prekážka málo dôveryhodná, vyhrá nasledujúca (vetva výmeny)
+    c3b = copy.deepcopy(c3)
+    c3b[all3[0]["i_takeoff"]]["confidence"] = 0.5
+    rej = []
+    fl = ha.find_hurdle_flights(c3b, sig3, fps, min_sep_s=3.2, rejected=rej)
+    out["sep_next"] = (len(fl), fl[0]["i_takeoff"] if fl else None, all3[-1]["i_takeoff"],
+                       [r for rj in rej for r in rj["reasons"]])
+    print(f"  zdvih panvy skutočných prekážok: {[round(r, 3) for r in rises]}")
+    print(f"  dôvera: prekážok {out['conf'][0]}, dôvody {out['conf'][1]}")
+    print(f"  nereálny zdvih: prekážok {out['rise'][0]}, dôvody {out['rise'][1]}")
+    print(f"  odstup (predch.): prekážok {out['sep_prev'][0]} z {len(all3)}, dôvody {out['sep_prev'][1][:1]}")
+    print(f"  odstup (nasl.): prekážok {out['sep_next'][0]}, ostala {out['sep_next'][1]} (posledná {out['sep_next'][2]}), dôvody {out['sep_next'][3][:1]}")
+    return out
+
+
 def end_to_end():
     """Celý analyze_hurdle_video() so syntetickou kostrou namiesto MediaPipe."""
     import os
@@ -265,6 +517,77 @@ def main():
     check(r110["found"] == 5 and r110["steps"] == [3, 3, 3, 3], f"110 m: 3 kroky ({r110['steps']})")
     check(r110n["found"] == 5 and r110n["steps"] == [3, 3, 3, 3], f"110 m so šumom: 3 kroky ({r110n['steps']})")
     check(rpan["found"] == 3 and rpan["steps"] == [13, 13], f"panning: rytmus sedí ({rpan['steps']})")
+
+    print("\n=== Vypadnutý kontakt uprostred úseku ===")
+    mc = missed_contact_case()
+    check(mc["found"] == 3, f"falošná prekážka z chýbajúceho kontaktu sa zamietla (prekážok {mc['found']})")
+    check(mc["steps"] == [12, 13], f"surové kroky 12-13, nie 8-3 ({mc['steps']})")
+    check(any("tej istej nohy" in r for rj in mc["rejected"] for r in rj["reasons"]),
+          "dôvod zamietnutia: odraz a dopad z tej istej nohy")
+    res_mc = end_to_end_missed_contact()
+    ivs = res_mc["intervals"]
+    check(res_mc["summary"]["hurdles_detected"] == 3, "celý reťazec: stále 3 prekážky")
+    check(len(ivs) == 2 and ivs[0]["steps_valid"] is False and ivs[0]["valid"] is True,
+          "prvý úsek: medzičas platný, počet krokov neistý")
+    check(len(ivs) == 2 and "chýba kontakt" in (ivs[0]["invalid_reason"] or ""),
+          "prvý úsek má dôvod „chýba kontakt“")
+    check(len(ivs) == 2 and ivs[1]["steps_between"] == 13 and ivs[1]["steps_valid"],
+          "druhý úsek: 13 krokov, platný")
+    check(res_mc["summary"]["steps_pattern_text"] == "?-13",
+          f"rytmus sa ukáže ako ?-13 (je {res_mc['summary']['steps_pattern_text']})")
+    check(res_mc["summary"]["interval_mean_s"] is not None
+          and abs(res_mc["summary"]["interval_mean_s"] - 3.54) < 0.03,
+          "priemerný medzičas sa počíta z oboch úsekov (chýbajúci kontakt ho nemení)")
+    check(res_mc["reliability"]["level"] == "low", f"spoľahlivosť „low“ (je {res_mc['reliability']['level']})")
+    check(any("Zamietol som" in w for w in res_mc["warnings"]), "upozornenie na zamietnutý let")
+    check(len(res_mc["technique"]["findings"]) >= 2, "hodnotenie beží ďalej z platných úsekov")
+
+    print("\n=== 110 m: vypadnutý kontakt v 3-krokovom úseku ===")
+    r110m = sprint_missed_contact()
+    check(r110m["summary"]["steps_pattern_text"] == "3-?-3-3",
+          f"rytmus 3-?-3-3, nie 3-2-3-3 (je {r110m['summary']['steps_pattern_text']})")
+    check(r110m["intervals"][1]["steps_valid"] is False and r110m["reliability"]["level"] == "low",
+          "úsek s chýbajúcim kontaktom je neúplný a spoľahlivosť „low“")
+    check(not any(f["status"] == "problem" for f in r110m["technique"]["findings"]),
+          "hodnotenie nehlási falošný problém s rytmom")
+
+    print("\n=== 400 m: prekážka bez dopadu / so zamenenými nohami ===")
+    sw = swallowed_hurdle()
+    for label, res in sw.items():
+        iv = res["intervals"][0] if res["intervals"] else None
+        check(res["summary"]["hurdles_detected"] == 2, f"{label}: prekážka sa zamietla (ostali 2)")
+        check(iv is not None and iv["valid"] is False and "spája dva úseky" in (iv["invalid_reason"] or ""),
+              f"{label}: zlúčený úsek je neplatný s dôvodom „spája dva úseky“")
+        check(res["summary"]["interval_mean_s"] is None and res["summary"]["speed_between_ms_mean"] is None,
+              f"{label}: zlúčený medzičas nejde do priemeru ani rýchlosti")
+        check(res["reliability"]["level"] == "unusable", f"{label}: spoľahlivosť „unusable“")
+
+    print("\n=== Zle zvolená disciplína ===")
+    wd = wrong_discipline()
+    check(wd is not None and "disciplína" in wd, "3-krokový rytmus ako 400 m sa odmietne s vysvetlením")
+
+    print("\n=== Tréning: 1-krokový rytmus ===")
+    od = one_stride_drill()
+    check(od["found"] == 6 and od["steps"] == [1, 1, 1, 1, 1], f"6 prekážok, kroky {od['steps']}")
+
+    print("\n=== Brány kandidátov ===")
+    g = gate_cases()
+    check(g["base"] == 3 and min(g["rises"]) >= 1.5 * ha.MIN_HIP_RISE_TORSO,
+          f"zdvih skutočných prekážok má rezervu nad prahom {ha.MIN_HIP_RISE_TORSO} ({[round(r, 2) for r in g['rises']]})")
+    check(any("tej istej nohy" in r for rj in mc["rejected"] for r in rj["reasons"])
+          and all((rj["hip_rise_torso"] or 0) < ha.MIN_HIP_RISE_TORSO for rj in mc["rejected"]),
+          "falošná prekážka z chýbajúceho kontaktu má zdvih pod prahom")
+    check(g["conf"][0] == 2 and any("nízka dôvera" in r for r in g["conf"][1]), "brána dôvery kostry")
+    check(g["rise"][0] == 2 and any("nereálny zdvih" in r for r in g["rise"][1]), "brána nereálneho zdvihu")
+    check(g["sep_prev"][0] < 3 and any("príliš blízko k predchádzajúcej" in r for r in g["sep_prev"][1]),
+          "minimálny odstup: blízky kandidát sa zamietne")
+    check(g["sep_next"][0] >= 1 and g["sep_next"][1] == g["sep_next"][2]
+          and any("príliš blízko k nasledujúcej" in r for r in g["sep_next"][3]),
+          "minimálny odstup: vierohodnejší neskorší kandidát nahradí skorší")
+
+    print("\n=== Video bez bežca ===")
+    msg = refuse_low_detection()
+    check(msg is not None and "40 %" in msg, "analýza odmietne video s kostrou na 40 % snímok v úseku s bežcom")
 
     print("\n=== Celý reťazec analyze_hurdle_video() ===")
     ok = end_to_end() and ok

@@ -7,6 +7,11 @@
  *   3. jas sa porovná so základom z kalibrácie – keď sa naraz zmení aspoň štvrtina bodov
  *      v dvoch snímkach po sebe, bežec pretol čiaru → stop alebo medzičas.
  *
+ * Zdrojom obrazu je živá kamera alebo video zo záznamu (súbor zo zariadenia / už nahraná
+ * analýza). Pri zázname sú hodinami stopiek časová stopa videa: Štart označí aktuálny snímok
+ * ako čas 0, pretnutie čiary zastaví čas na snímku cieľa; pauza ani spomalené prehrávanie
+ * čas nemenia a presnosť je ±1 snímok videa.
+ *
  * Čisté výpočty sú hore a bez DOM, aby sa dali spustiť v node teste; v prehliadači sa
  * export preskočí a pokračuje sa na ovládanie stránky.
  */
@@ -34,7 +39,8 @@
     /** ms → 'mm:ss.hh'. Nezmysly (NaN, záporné) ukážu nulu, nie 'NaN:NaN'. */
     function formatTime(ms) {
         if (!Number.isFinite(ms) || ms < 0) ms = 0;
-        const hundredths = Math.floor(ms / 10);
+        // Najprv na celé ms: rozdiel časových značiek videa (3,4 − 1,0 = 2,3999…) nesmie ukázať 2,39.
+        const hundredths = Math.floor(Math.round(ms) / 10);
         const h = hundredths % 100;
         const s = Math.floor(hundredths / 100) % 60;
         const m = Math.floor(hundredths / 6000);
@@ -155,6 +161,10 @@
     const btnStart = $('btn-start'), btnStop = $('btn-stop'), btnLap = $('btn-lap'), btnReset = $('btn-reset');
     const lapsList = $('laps'), lapsEmpty = $('laps-empty'), lapsCount = $('laps-count');
     const saveBox = $('save-box');
+    const btnFile = $('btn-file'), fileInput = $('file-input'), savedSelect = $('saved-video');
+    const fileControls = $('file-controls'), fileName = $('file-name'), fileTime = $('file-time');
+    const btnPlay = $('btn-play'), btnPrev = $('btn-prev'), btnNext = $('btn-next');
+    const seekInput = $('seek'), speedSelect = $('speed');
 
     const mediaOk = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
 
@@ -195,16 +205,35 @@
     };
     let lastTimeText = '';
 
+    // Zdroj obrazu: 'camera' = živá kamera (hodiny = performance.now()),
+    // 'file' = video zo záznamu (hodiny = časová stopa videa, pauza ich zastaví).
+    let source = 'camera';
+    function mediaNow() { return video.currentTime * 1000; }
+    function clockNow() { return source === 'file' ? mediaNow() : performance.now(); }
+    function byPhotocell() { return timer.stopMode === 'fotobunka' || timer.stopMode === 'zaznam'; }
+
     function elapsedAt(now) { return timer.running ? Math.max(0, now - timer.origin) : timer.elapsed; }
 
     function renderTime(now) {
-        const text = formatTime(elapsedAt(now === undefined ? performance.now() : now));
+        const text = formatTime(elapsedAt(now === undefined ? clockNow() : now));
         if (text !== lastTimeText) { timeEl.textContent = text; lastTimeText = text; }
     }
 
     function startTimer(at) {
         if (timer.running) return;
-        const now = Number.isFinite(at) ? at : performance.now();
+        let now = Number.isFinite(at) ? at : clockNow();
+        if (source === 'file') {
+            // Záznam: Štart znamená „tento snímok je čas 0“ – vždy odznova, nie pokračovanie.
+            // Čas 0 je presná časová značka zobrazeného snímku (z requestVideoFrameCallback),
+            // nie poloha prehrávača, ktorá pri krokovaní leží kdesi vnútri snímku.
+            if (cell.lastMediaTime >= 0 && Math.abs(cell.lastMediaTime * 1000 - now) <= 2 * frameStepMs()) {
+                now = cell.lastMediaTime * 1000;
+            }
+            timer.elapsed = 0;
+            timer.laps = [];
+            renderLaps();
+            if (video.paused) video.play().catch(function () { /* prehrá sa po interakcii */ });
+        }
         timer.origin = now - timer.elapsed;
         timer.runStartedAt = now;
         timer.running = true;
@@ -218,11 +247,12 @@
 
     function stopTimer(mode, at) {
         if (!timer.running) return;
-        const now = performance.now();
+        const now = clockNow();
         const t = Number.isFinite(at) ? Math.min(at, now) : now;
         timer.elapsed = Math.max(0, t - timer.origin);
         timer.running = false;
-        timer.stopMode = mode;
+        timer.stopMode = source === 'file' ? (mode === 'fotobunka' ? 'zaznam' : 'zaznam-rucne') : mode;
+        if (source === 'file' && !video.paused) video.pause();   // snímok cieľa ostane na obraze
         renderTime(now);
         setState(mode === 'fotobunka' ? 'crossed' : 'ready');
         updateControls();
@@ -231,7 +261,7 @@
 
     function addLap(at) {
         if (!timer.running) return;
-        const now = performance.now();
+        const now = clockNow();
         const t = Number.isFinite(at) ? Math.min(at, now) : now;
         let total = Math.max(0, t - timer.origin);
         const prev = timer.laps.length ? timer.laps[timer.laps.length - 1] : 0;
@@ -281,11 +311,11 @@
         btnStop.disabled = !timer.running;
         btnLap.disabled = !timer.running;
         btnReset.disabled = timer.running || (timer.elapsed === 0 && timer.laps.length === 0);
-        btnStart.textContent = (!timer.running && timer.elapsed > 0) ? 'Pokračovať' : 'Štart';
+        btnStart.textContent = (!timer.running && timer.elapsed > 0 && source !== 'file') ? 'Pokračovať' : 'Štart';
         timeEl.classList.toggle('running', timer.running);
         timeLabel.textContent = timer.running ? 'Beží'
-            : timer.stopMode === 'fotobunka' ? 'Zastavené fotobunkou'
-            : timer.stopMode === 'rucne' ? 'Zastavené ručne' : 'Čas';
+            : byPhotocell() ? 'Zastavené fotobunkou'
+            : timer.stopMode ? 'Zastavené ručne' : 'Čas';
     }
 
     function setState(name) {
@@ -304,7 +334,7 @@
         $('result_s').value = (timer.elapsed / 1000).toFixed(2);
         $('laps_field').value = timer.laps.map(function (ms) { return (ms / 1000).toFixed(2); }).join(',');
         $('stop_mode').value = timer.stopMode || 'rucne';
-        $('precision_ms').value = timer.stopMode === 'fotobunka' ? String(Math.round(measuredFrameMs())) : '';
+        $('precision_ms').value = byPhotocell() ? String(Math.round(measuredFrameMs())) : '';
         $('save-summary').textContent = formatTime(timer.elapsed);
     }
 
@@ -331,8 +361,9 @@
 
     // ── Kamera ───────────────────────────────────────────────────────────────
     let stream = null;
-    let camOn = false;
-    let camGen = 0;                         // generácia kamery – starý snímkový callback sa po prepnutí zahodí
+    let camOn = false;                      // je pripojený zdroj obrazu (kamera alebo záznam)
+    let fileUrl = null;                     // blob URL vybraného súboru – uvoľní sa pri výmene
+    let camGen = 0;                         // generácia zdroja – starý snímkový callback sa po prepnutí zahodí
     let facing = 'environment';
     const useRvfc = 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
 
@@ -390,6 +421,8 @@
     }
 
     function attachStream(s) {
+        releaseFile();
+        source = 'camera';
         stream = s;
         camGen++;
         camOn = true;
@@ -408,6 +441,7 @@
                 if (stream === s) stopCamera('Kamera sa odpojila. Zapni ju znova alebo meraj ručne.');
             });
         });
+        if (mediaOk) btnSound.disabled = false;
         if (useRvfc) video.requestVideoFrameCallback(onVideoFrame.bind(null, camGen));
         navigator.mediaDevices.enumerateDevices().then(function (list) {
             const cams = list.filter(function (d) { return d.kind === 'videoinput'; });
@@ -421,6 +455,7 @@
     function stopCamera(reason) {
         if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
         stream = null;
+        releaseFile();
         camOn = false;
         camGen++;
         video.srcObject = null;
@@ -435,7 +470,7 @@
         cell.mask.fill(0);
         detector.reset();
         setCamMessage('Kamera je vypnutá', reason ||
-            'Zapni kameru a potiahni cieľovú čiaru na miesto, kde bežec končí. Stopky fungujú aj bez kamery – ručne.');
+            'Zapni kameru alebo nahraj video zo záznamu a potiahni cieľovú čiaru na miesto, kde bežec končí. Stopky fungujú aj bez kamery – ručne.');
         overlayDirty = true;
     }
 
@@ -445,6 +480,124 @@
         ensureProcSize();
         overlayDirty = true;
     });
+
+    // ── Video zo záznamu ─────────────────────────────────────────────────────
+    /** Uvoľní záznam (súbor aj URL) – volá sa pri zapnutí kamery a pri výmene videa. */
+    function releaseFile() {
+        if (source !== 'file' && !fileUrl) return;
+        video.pause();
+        video.removeAttribute('src');
+        video.load();
+        if (fileUrl) { URL.revokeObjectURL(fileUrl); fileUrl = null; }
+        source = 'camera';
+        fileControls.classList.add('hidden');
+        if (savedSelect) savedSelect.value = '';
+    }
+
+    /** Pripojí video zo súboru (blob URL) alebo z /media/<súbor>; kamera sa vypne. */
+    function attachFile(url, name, isBlob) {
+        if (timer.running) stopTimer('rucne');
+        stopCamera();                       // vypne kameru aj predošlý záznam
+        source = 'file';
+        fileUrl = isBlob ? url : null;
+        camGen++;
+        camOn = true;
+        video.playbackRate = Number(speedSelect.value) || 1;
+        video.src = url;
+        video.load();
+        camWrap.classList.add('cam-on');
+        camWrap.classList.remove('cam-off');
+        btnCalib.disabled = false;
+        btnFlip.classList.add('hidden');
+        btnFlip.disabled = true;
+        stopSoundStart();
+        btnSound.disabled = true;           // štart na zvuk z mikrofónu nemá pri zázname zmysel
+        cell.baseline = null;
+        cell.autoCalibrate = true;
+        cell.frames = 0;
+        cell.frameMs = 0;
+        cell.minFrameMs = 0;
+        cell.lastMediaTime = -1;
+        cell.note = null;
+        fileName.textContent = name || 'záznam';
+        seekInput.value = '0';
+        fileControls.classList.remove('hidden');
+        setPlayLabel();
+        if (useRvfc) video.requestVideoFrameCallback(onVideoFrame.bind(null, camGen));
+        overlayDirty = true;
+    }
+
+    function setPlayLabel() { btnPlay.textContent = video.paused ? 'Prehrať' : 'Pauza'; }
+
+    /** Dĺžka jedného snímku záznamu – najkratší interval nameraný počas prehrávania; kým sa nehralo, 1/30 s. */
+    function frameStepMs() { return cell.minFrameMs > 0 ? cell.minFrameMs : 1000 / 30; }
+
+    /**
+     * Krok o jeden snímok po mriežke snímok: cieľ je štvrtina do vnútra cieľového
+     * snímku, aby hľadanie neskončilo na hranici dvoch snímok (a nezáviselo od
+     * toho, či je aktuálna poloha presne na značke snímku alebo kdesi vnútri).
+     */
+    function stepFrame(dir) {
+        if (source !== 'file' || !camOn) return;
+        video.pause();
+        const stepS = frameStepMs() / 1000;
+        const k = Math.floor(video.currentTime / stepS + 0.01);
+        const dur = Number.isFinite(video.duration) ? video.duration : Infinity;
+        video.currentTime = Math.min(dur, Math.max(0, (k + dir) * stepS + stepS * 0.25));
+    }
+
+    function togglePlay() {
+        if (source !== 'file' || !camOn) return;
+        if (video.paused) video.play().catch(function () { /* formát / autoplay */ });
+        else video.pause();
+    }
+
+    let seekDrag = false;
+    seekInput.addEventListener('input', function () {
+        if (source !== 'file' || !Number.isFinite(video.duration)) return;
+        seekDrag = true;
+        video.pause();
+        video.currentTime = Number(seekInput.value) / 1000 * video.duration;
+    });
+    seekInput.addEventListener('change', function () { seekDrag = false; });
+    speedSelect.addEventListener('change', function () { video.playbackRate = Number(speedSelect.value) || 1; });
+    btnPlay.addEventListener('click', togglePlay);
+    btnPrev.addEventListener('click', function () { stepFrame(-1); });
+    btnNext.addEventListener('click', function () { stepFrame(1); });
+    video.addEventListener('play', setPlayLabel);
+    video.addEventListener('pause', setPlayLabel);
+    video.addEventListener('loadeddata', function () {
+        // Prvý snímok záznamu kalibruje základ hneď, aj keď sa ešte neprehráva.
+        if (source === 'file' && camOn) processFrame(performance.now(), mediaNow(), mediaNow());
+    });
+    video.addEventListener('seeked', function () {
+        // Bez requestVideoFrameCallback by sa krokovaný snímok nespracoval.
+        if (source === 'file' && camOn && !useRvfc && video.paused) processFrame(performance.now(), mediaNow(), mediaNow());
+    });
+    video.addEventListener('ended', function () {
+        if (source !== 'file') return;
+        if (timer.running) {
+            stopTimer('rucne');
+            cell.note = { text: 'záznam skončil bez pretnutia cieľa', until: performance.now() + 5000 };
+        }
+    });
+    video.addEventListener('error', function () {
+        if (source !== 'file') return;
+        stopCamera('Toto video sa nedá prehrať. Prehliadač formát nepodporuje – skús MP4 (H.264), alebo iný prehliadač.');
+    });
+    btnFile.addEventListener('click', function () { fileInput.click(); });
+    fileInput.addEventListener('change', function () {
+        const f = fileInput.files && fileInput.files[0];
+        if (!f) return;
+        attachFile(URL.createObjectURL(f), f.name, true);
+        fileInput.value = '';               // ten istý súbor sa dá vybrať znova
+    });
+    if (savedSelect) {
+        savedSelect.addEventListener('change', function () {
+            const opt = savedSelect.options[savedSelect.selectedIndex];
+            if (opt && opt.value) attachFile(opt.value, opt.textContent.trim(), false);
+        });
+    }
 
     // ── Fotobunka ────────────────────────────────────────────────────────────
     const proc = document.createElement('canvas');
@@ -459,8 +612,10 @@
         calibrateRequested: false,
         lastProcess: 0,
         frameMs: 0,                         // nameraný interval snímok kamery (EMA)
+        minFrameMs: 0,                      // najkratší interval – dĺžka jedného snímku záznamu (krokovanie)
         frames: 0,
         lastMediaTime: -1,
+        note: null,                         // krátka správa do stavu fotobunky {text, until}
         flashUntil: 0,                      // čiara na chvíľu zbelie pri pretnutí
         crossedUntil: 0,                    // pri medzičase svieti CIEĽ PRETNUTÝ len chvíľu
     };
@@ -501,26 +656,39 @@
     function noteFrameInterval(dt) {
         if (!(dt > 4 && dt < 500)) return;
         cell.frameMs = cell.frameMs ? cell.frameMs * 0.9 + dt * 0.1 : dt;
+        cell.minFrameMs = cell.minFrameMs ? Math.min(cell.minFrameMs, dt) : dt;
         cell.frames++;
     }
 
-    /** Snímka z kamery cez requestVideoFrameCallback – presný čas snímky a jej skutočný interval. */
+    /**
+     * Snímka cez requestVideoFrameCallback – presný čas snímky a jej skutočný interval.
+     * Pri zázname je časom snímky jej poloha vo videu (mediaTime), nie hodiny prehliadača.
+     */
     function onVideoFrame(gen, now, meta) {
         if (gen !== camGen || !camOn) return;
-        if (meta && Number.isFinite(meta.mediaTime)) {
-            if (cell.lastMediaTime >= 0) noteFrameInterval((meta.mediaTime - cell.lastMediaTime) * 1000);
+        const hasMedia = !!(meta && Number.isFinite(meta.mediaTime));
+        if (hasMedia) {
+            // Interval snímok sa meria len pri prehrávaní – pri krokovaní prehliadač
+            // zlučuje viac hľadaní do jedného a rozdiel by nebol jeden snímok.
+            if (cell.lastMediaTime >= 0 && (source !== 'file' || !video.paused)) {
+                noteFrameInterval((meta.mediaTime - cell.lastMediaTime) * 1000);
+            }
             cell.lastMediaTime = meta.mediaTime;
         }
-        let frameTime = now;
-        // captureTime je na rovnakých hodinách ako performance.now(); ak je rozumný, odpočíta oneskorenie kamery.
-        if (meta && Number.isFinite(meta.captureTime) && now - meta.captureTime >= 0 && now - meta.captureTime < 1000) {
+        let frameTime = now, clockT = now;
+        if (source === 'file') {
+            frameTime = hasMedia ? meta.mediaTime * 1000 : mediaNow();
+            clockT = frameTime;
+        } else if (meta && Number.isFinite(meta.captureTime) && now - meta.captureTime >= 0 && now - meta.captureTime < 1000) {
+            // captureTime je na rovnakých hodinách ako performance.now(); ak je rozumný, odpočíta oneskorenie kamery.
             frameTime = meta.captureTime;
         }
-        processFrame(now, frameTime);
+        processFrame(now, frameTime, clockT);
         video.requestVideoFrameCallback(onVideoFrame.bind(null, gen));
     }
 
-    function processFrame(now, frameTime) {
+    /** now = hodiny prehliadača (efekty), frameTime = čas snímky, clockT = hodiny stopiek pre ochrannú dobu. */
+    function processFrame(now, frameTime, clockT) {
         if (!camOn || video.readyState < 2 || !ensureProcSize()) return;
         pctx.drawImage(video, 0, 0, proc.width, proc.height);
         let data;
@@ -548,7 +716,7 @@
         cell.fraction = fraction;
         if (fraction < QUIET_FRACTION) adaptBaseline(cell.baseline, cell.lum, BASELINE_ALPHA);
 
-        const armed = timer.running && (now - timer.runStartedAt) >= guardMs();
+        const armed = timer.running && (clockT - timer.runStartedAt) >= guardMs();
         const hitAt = detector.step(fraction, armed, frameTime);
         if (hitAt !== null) onCrossing(hitAt, now);
         overlayDirty = true;
@@ -566,10 +734,17 @@
     }
 
     function cellStatusText(now) {
+        if (cell.note && now < cell.note.until) return cell.note.text;
+        if (source === 'file' && camOn) {
+            if (!cell.baseline) return 'čaká na kalibráciu';
+            if (!timer.running) return byPhotocell() ? 'pretnutá' : (video.paused ? 'záznam pozastavený' : 'pripravená');
+            if (mediaNow() - timer.runStartedAt < guardMs()) return 'ochranná doba';
+            return video.paused ? 'záznam pozastavený' : 'aktívna';
+        }
         if (!mediaOk) return 'kamera nedostupná';
         if (!camOn) return 'kamera vypnutá';
         if (!cell.baseline) return 'čaká na kalibráciu';
-        if (!timer.running) return timer.stopMode === 'fotobunka' ? 'pretnutá' : 'pripravená';
+        if (!timer.running) return byPhotocell() ? 'pretnutá' : 'pripravená';
         if (now - timer.runStartedAt < guardMs()) return 'ochranná doba';
         return 'aktívna';
     }
@@ -813,15 +988,36 @@
     }
 
     // ── Hlavná slučka: čas, spracovanie snímok (bez rVFC), kreslenie, popisky ─
-    let lastPrecisionAt = 0, lastStatus = '', lastPct = -1;
+    let lastPrecisionAt = 0, lastStatus = '', lastPct = -1, lastFileTime = '';
 
     function tick(now) {
-        if (timer.running) renderTime(now);
+        if (timer.running) renderTime(clockNow());
 
         if (camOn && !useRvfc && now - cell.lastProcess >= PROCESS_INTERVAL_MS - 1) {
-            if (cell.lastProcess) noteFrameInterval(now - cell.lastProcess);
-            cell.lastProcess = now;
-            processFrame(now, now);
+            if (source === 'file') {
+                // Bez requestVideoFrameCallback: spracuj len nový snímok, čas z videa.
+                const m = video.currentTime;
+                if (m !== cell.lastMediaTime) {
+                    if (cell.lastMediaTime >= 0) noteFrameInterval((m - cell.lastMediaTime) * 1000);
+                    cell.lastMediaTime = m;
+                    cell.lastProcess = now;
+                    processFrame(now, m * 1000, m * 1000);
+                }
+            } else {
+                if (cell.lastProcess) noteFrameInterval(now - cell.lastProcess);
+                cell.lastProcess = now;
+                processFrame(now, now, now);
+            }
+        }
+
+        if (source === 'file' && camOn) {
+            const dur = Number.isFinite(video.duration) ? video.duration : 0;
+            const text = formatTime(mediaNow()) + ' / ' + formatTime(dur * 1000);
+            if (text !== lastFileTime) { lastFileTime = text; fileTime.textContent = text; }
+            if (!seekDrag && dur > 0) {
+                const pos = String(Math.round(video.currentTime / dur * 1000));
+                if (seekInput.value !== pos) seekInput.value = pos;
+            }
         }
 
         pollSound(now);
@@ -847,7 +1043,7 @@
             lastPrecisionAt = now;
             const ms = measuredFrameMs();
             const text = camOn && cell.frames >= 10
-                ? 'Presnosť fotobunky: ±' + Math.round(ms) + ' ms pri ' + Math.round(1000 / ms) + ' fps kamere (namerané)'
+                ? 'Presnosť fotobunky: ±' + Math.round(ms) + ' ms pri ' + Math.round(1000 / ms) + ' fps ' + (source === 'file' ? 'zázname' : 'kamere') + ' (namerané)'
                 : 'Presnosť fotobunky: ±33 ms pri 30 fps kamere (odhad, kým kamera nebeží)';
             if (text !== precisionEl.textContent) precisionEl.textContent = text;
         }
@@ -860,7 +1056,7 @@
     btnStop.addEventListener('click', function () { stopTimer('rucne'); });
     btnLap.addEventListener('click', function () { addLap(); });
     btnReset.addEventListener('click', function () { resetTimer(); });
-    btnCam.addEventListener('click', function () { camOn ? stopCamera() : startCamera(); });
+    btnCam.addEventListener('click', function () { (camOn && source === 'camera') ? stopCamera() : startCamera(); });
     btnFlip.addEventListener('click', function () {
         facing = facing === 'environment' ? 'user' : 'environment';
         startCamera();
@@ -893,6 +1089,10 @@
             addLap();
         } else if (e.key === 'r' || e.key === 'R') {
             resetTimer();
+        } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+            if (source === 'file' && camOn) { e.preventDefault(); stepFrame(e.key === 'ArrowLeft' ? -1 : 1); }
+        } else if (e.key === 'p' || e.key === 'P') {
+            togglePlay();
         }
     });
     document.addEventListener('keyup', function (e) {
@@ -901,9 +1101,10 @@
 
     // ── Štart ────────────────────────────────────────────────────────────────
     if (!mediaOk) {
-        setCamMessage('Kamera nie je dostupná', window.isSecureContext
+        setCamMessage('Kamera nie je dostupná', (window.isSecureContext
             ? 'Tento prehliadač nepodporuje prístup ku kamere. Stopky fungujú ručne – Štart a Stop.'
-            : 'Prehliadač pustí kameru len cez zabezpečené spojenie. Otvor stránku cez https, alebo priamo na tomto počítači cez http://localhost. Ručné stopky fungujú aj tak.');
+            : 'Prehliadač pustí kameru len cez zabezpečené spojenie. Otvor stránku cez https, alebo priamo na tomto počítači cez http://localhost. Ručné stopky fungujú aj tak.')
+            + ' Fotobunka funguje aj nad videom zo záznamu.');
         camWrap.classList.add('cam-off');
         btnCam.disabled = true;
         btnSound.disabled = true;

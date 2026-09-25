@@ -1,3 +1,19 @@
+# Zmeny „stopky zo záznamu“ (september 2026)
+
+- Fotobunka beží aj nad videom zo záznamu: tlačidlo **Video zo záznamu** (súbor zo zariadenia) a pre
+  prihláseného ponuka videí z jeho analýz (šprint aj prekážky, cez chránenú routu `/media/<súbor>`).
+- Pri zázname sú hodinami stopiek časová stopa videa (`video.currentTime`, pri
+  `requestVideoFrameCallback` `mediaTime` snímky): Štart označí aktuálny snímok ako čas 0, pretnutie
+  čiary zastaví čas na snímku cieľa a záznam pozastaví; pauza ani spomalené prehrávanie čas nemenia.
+- Prehrávanie: posuvník, krok o snímok (← →; dĺžka snímku sa meria z časovej stopy), Prehrať / Pauza
+  (P), rýchlosť 0,25× / 0,5× / 1×. Štart na zvuk a otáčanie kamery sú pri zázname vypnuté; funguje aj
+  bez https (kameru nepotrebuje).
+- Nové spôsoby zastavenia `zaznam` / `zaznam-rucne` → poznámka „Stopky zo záznamu videa – zastavené
+  fotobunkou (±33 ms)“; `<video>` už nemá `autoplay` (kamera sa púšťa z kódu ako doteraz).
+- Test `test_stopky_zaznam.mjs`: syntetické video (pruh pretne čiaru v 3,406 s) v headless Google
+  Chrome cez DevTools protokol – načítanie, krokovanie, Štart + fotobunka (2,40 s ± 1 snímok), pauza,
+  0,25×, koniec záznamu, uvoľnenie pri zapnutí kamery.
+
 # Zmeny „prekážky – kontrola vierohodnosti“ (september 2026)
 
 Podnet: televízny zostrih finále 400 m prekážok (92 s, strihy, osem bežkýň, kostra na 45 % snímok)

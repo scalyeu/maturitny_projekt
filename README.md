@@ -107,7 +107,8 @@ nesedí zvolená disciplína (prekážky bližšie, než dovoľuje jej najrýchl
 
 Stopky s kamerou a virtuálnou fotobunkou, ktorá zastaví čas, keď bežec pretne čiaru v obraze. Stránka je verejná –
 merať môže aj neprihlásený návštevník; prihlásený zverenec si nameraný čas uloží medzi výsledky, tréner ho uloží
-vybranému zverencovi.
+vybranému zverencovi. Fotobunka funguje aj **zo záznamu**: namiesto živej kamery nahráš video zo zariadenia (alebo
+vyberieš video z už nahraných analýz) a čas sa meria z jeho časovej stopy.
 
 **Ako merať**
 
@@ -119,6 +120,12 @@ vybranému zverencovi.
    štartéra. Keď bežec pretne čiaru, čas sa zastaví alebo sa zapíše medzičas – podľa voľby **Pri pretnutí**.
 5. **Medzičas** (L), **Stop** (medzerník), **Reset** (R). **Štart na zvuk** odštartuje na tlesknutie alebo výstrel
    z mikrofónu.
+
+**Zo záznamu**: stlač **Video zo záznamu** a vyber súbor (prihlásený má v ponuke aj videá zo svojich analýz).
+Pod obrazom pribudne prehrávanie: posuvník, **− snímok / + snímok** (šípky ← →), **Prehrať / Pauza** (P) a rýchlosť
+0,25× / 0,5× / 1×. Nájdi snímok štartu, stlač **Štart** – ten snímok je čas 0 a video sa rozbehne; pri pretnutí čiary
+sa čas zastaví a záznam ostane stáť na snímku cieľa. Čas ide z časovej stopy videa, takže pauza, spomalenie ani
+výkon počítača ho nemenia; presnosť je ±1 snímok videa a v poznámke k výsledku je „zo záznamu videa“.
 
 Pod obrazom vidíš stav fotobunky, pruh aktivity (podiel zmenených bodov na čiare), posuvník **Citlivosť** a
 nameranú presnosť, napr. „±33 ms pri 30 fps kamere“. Po zastavení sa prihlásenému zobrazí formulár na uloženie:
@@ -540,6 +547,7 @@ cez GET. Žiadny test nenašiel čítanie ani zápis cudzích údajov, obídenie
 venv/bin/python -m pytest -q test_world_athletics.py   # 60 testov, offline (HTTP je nahradené)
 python test_video_analysis.py     # kontakt so zemou, mierka, dĺžka kroku, celý reťazec – syntetické dáta
 python test_hurdle_analysis.py    # prekážky: detekcia, kroky medzi prekážkami, medzičasy, kontrola vierohodnosti
+node test_stopky_zaznam.mjs        # stopky zo záznamu v headless Google Chrome (potrebuje Chrome a Node 22+)
 python test_optical_flow.py       # optický tok na vykreslenom videu s textúrami
 ```
 

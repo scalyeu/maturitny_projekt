@@ -16,8 +16,9 @@
             <p class="eyebrow mb-2">{{ eyebrow }}</p>
             <h1 class="text-[44px] leading-none font-headline font-extrabold uppercase text-on-surface">{{ title }}</h1>
         </div>
-        <p class="mono text-[11px] text-on-surface-variant max-w-[44ch] leading-relaxed">
+        <p class="mono text-[11px] text-on-surface-variant max-w-[48ch] leading-relaxed">
             Medzerník = štart / stop · L = medzičas · R = reset.
+            Pri zázname ← → = snímok, P = prehrať / pauza.
             Čiaru v obraze potiahneš myšou alebo prstom.
         </p>
     </div>
@@ -27,7 +28,7 @@
         <!-- ── Kamera + fotobunka ── -->
         <section class="lg:col-span-7 min-w-0">
             <div class="cam-wrap" id="cam-wrap">
-                <video id="cam" playsinline muted autoplay></video>
+                <video id="cam" playsinline muted></video>
                 <canvas id="overlay" aria-label="Cieľová čiara – potiahni ju na miesto cieľa"></canvas>
 
                 <div class="cam-status">
@@ -39,7 +40,7 @@
                 <div class="cam-msg" id="cam-msg">
                     <p class="font-headline font-bold text-lg text-on-surface mb-2">Kamera je vypnutá</p>
                     <p class="text-[13px] text-on-surface-variant max-w-[40ch] mx-auto" id="cam-msg-text">
-                        Zapni kameru a potiahni cieľovú čiaru na miesto, kde bežec končí.
+                        Zapni kameru alebo nahraj video zo záznamu a potiahni cieľovú čiaru na miesto, kde bežec končí.
                         Stopky fungujú aj bez kamery – ručne.
                     </p>
                 </div>
@@ -77,6 +78,53 @@
                         class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface-variant hover:text-on-surface transition-colors">
                     Štart na zvuk
                 </button>
+                <button type="button" id="btn-file"
+                        class="border border-white/15 hover:border-white/35 px-5 py-3 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                    Video zo záznamu
+                </button>
+                <input type="file" id="file-input" accept="video/*" class="hidden">
+                {% if saved_videos %}
+                <select id="saved-video" class="text-[11px] uppercase tracking-[0.1em]" aria-label="Uložené video z analýz">
+                    <option value="">Uložené video z analýz…</option>
+                    {% for v in saved_videos %}
+                    <option value="{{ v.url }}">{{ v.label }} · {{ v.kind }} · {{ v.created_at.strftime('%d.%m.%Y') }}</option>
+                    {% endfor %}
+                </select>
+                {% endif %}
+            </div>
+
+            <!-- Prehrávanie záznamu – len pri videu zo súboru -->
+            <div class="mt-4 hidden border border-white/10 bg-surface-container p-4" id="file-controls">
+                <div class="flex items-baseline justify-between gap-4 mb-3">
+                    <p class="eyebrow truncate" id="file-name">záznam</p>
+                    <p class="mono text-[11px] text-on-surface whitespace-nowrap" id="file-time">00:00.00 / 00:00.00</p>
+                </div>
+                <input type="range" id="seek" min="0" max="1000" step="1" value="0" class="range" aria-label="Poloha v zázname">
+                <div class="mt-3 flex flex-wrap items-center gap-2">
+                    <button type="button" id="btn-prev" title="Snímok späť (←)"
+                            class="border border-white/15 hover:border-white/35 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                        − snímok
+                    </button>
+                    <button type="button" id="btn-play" title="Prehrať / pauza (P)"
+                            class="border border-white/15 hover:border-white/35 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors min-w-[7ch]">
+                        Prehrať
+                    </button>
+                    <button type="button" id="btn-next" title="Snímok vpred (→)"
+                            class="border border-white/15 hover:border-white/35 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-on-surface transition-colors">
+                        + snímok
+                    </button>
+                    <label for="speed" class="eyebrow ml-auto">Rýchlosť</label>
+                    <select id="speed" class="text-[11px]">
+                        <option value="0.25">0,25×</option>
+                        <option value="0.5">0,5×</option>
+                        <option value="1" selected>1×</option>
+                    </select>
+                </div>
+                <p class="text-[11px] text-on-surface-variant mt-3 leading-relaxed">
+                    Nájdi snímok štartu (šípkami po jednom snímku), stlač <b class="text-on-surface">Štart</b> – ten snímok je čas 0 a video
+                    sa rozbehne. Čas ide z časovej stopy videa, takže pauza ani spomalenie ho nemenia; pri pretnutí čiary sa
+                    záznam zastaví na snímku cieľa.
+                </p>
             </div>
 
             <!-- Nastavenia fotobunky -->
@@ -248,8 +296,8 @@
         <div class="rule"><p class="eyebrow">Ako fotobunka funguje</p></div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-px bg-white/10 border border-white/10">
             {% set steps = [
-                ('01', 'Postav kameru',
-                 'Telefón alebo notebook postav kolmo na dráhu, stabilne, s pokojným pozadím za cieľom. Zapni kameru a potiahni čiaru presne na cieľ – môže byť aj šikmá.'),
+                ('01', 'Postav kameru alebo nahraj záznam',
+                 'Telefón alebo notebook postav kolmo na dráhu, stabilne, s pokojným pozadím za cieľom. Zapni kameru a potiahni čiaru presne na cieľ – môže byť aj šikmá. Alebo nahraj video zo záznamu: čas sa potom meria z časovej stopy videa.'),
                 ('02', 'Kalibruj',
                  'Pri prázdnom cieli stlač Kalibrovať. Fotobunka si zapamätá jas ~64 bodov na čiare a pomaly ho dolaďuje, kým sa nič nehýbe.'),
                 ('03', 'Štart',
@@ -265,8 +313,9 @@
         </div>
         <p class="text-[12px] text-on-surface-variant mt-4 max-w-[80ch] leading-relaxed">
             Presnosť je daná snímkovou frekvenciou kamery (pri 30 fps ±33 ms) a oneskorením kamery v prehliadači, ktoré sa neodpočítava.
+            Pri zázname oneskorenie odpadá – presnosť je ±1 snímok videa a štart je taký presný, ako presne nájdeš snímok štartu.
             Na oficiálne výsledky to nestačí, na tréningové merania a porovnanie medzi sebou áno.
-            Kamera funguje len cez zabezpečené spojenie (https alebo localhost); bez nej ostávajú ručné stopky.
+            Kamera funguje len cez zabezpečené spojenie (https alebo localhost); bez nej ostávajú ručné stopky a video zo záznamu.
         </p>
     </section>
 </main>

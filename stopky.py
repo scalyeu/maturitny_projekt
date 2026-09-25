@@ -2,7 +2,9 @@
 Blueprint 'stopky' – stopky s kamerou a virtuálnou fotobunkou.
 
 Stránka je verejná: meranie beží celé v prehliadači (static/js/stopky.js),
-server nič nepočíta. Prihlásenému používateľovi navyše uloží nameraný čas ako
+server nič nepočíta. Fotobunka vie bežať aj nad videom zo záznamu (súbor
+zo zariadenia alebo video z už nahraných analýz) – vtedy ide čas z časovej
+stopy videa. Prihlásenému používateľovi navyše uloží nameraný čas ako
 RaceResult(source='stopky') a ukáže posledné merania, ktoré smie vidieť.
 Tréner ukladá čas vybranému zverencovi – cudzí zverenec skončí 403, nie potichu
 nahradený vlastným účtom.
@@ -12,7 +14,7 @@ from datetime import date
 
 from flask import Blueprint, render_template, request, redirect, url_for, flash, g
 
-from models import db, RaceResult
+from models import db, RaceResult, VideoAnalysis, HurdleAnalysis
 from auth import login_required, visible_athletes, require_visible_athlete, scope_query
 
 bp = Blueprint('stopky', __name__, url_prefix='/stopky')
@@ -26,7 +28,14 @@ OTHER_DISCIPLINE = 'iné'
 MAX_RESULT_S = 6 * 3600
 MIN_RESULT_S = 0.01
 NOTE_MAX = 500
-STOP_MODES = {'fotobunka': 'zastavené fotobunkou', 'rucne': 'zastavené ručne'}
+STOP_MODES = {
+    'fotobunka': 'Stopky s kamerou – zastavené fotobunkou',
+    'rucne': 'Stopky s kamerou – zastavené ručne',
+    'zaznam': 'Stopky zo záznamu videa – zastavené fotobunkou',
+    'zaznam-rucne': 'Stopky zo záznamu videa – zastavené ručne',
+}
+PHOTOCELL_MODES = ('fotobunka', 'zaznam')
+SAVED_VIDEOS_LIMIT = 20
 
 
 def _parse_seconds(raw):
@@ -65,10 +74,9 @@ def _build_note(user_note, laps, stop_mode, precision_ms):
         lines.append(user_note)
     if laps:
         lines.append('Medzičasy: ' + ', '.join(_format_seconds(v) for v in laps))
-    how = STOP_MODES.get(stop_mode)
-    if how:
-        detail = f'Stopky s kamerou – {how}'
-        if stop_mode == 'fotobunka' and precision_ms:
+    detail = STOP_MODES.get(stop_mode)
+    if detail:
+        if stop_mode in PHOTOCELL_MODES and precision_ms:
             detail += f' (±{precision_ms} ms)'
         lines.append(detail)
     note = '\n'.join(lines).strip()
@@ -82,6 +90,28 @@ def _recent_results(limit=10):
     query = RaceResult.query.filter(RaceResult.source == 'stopky')
     query = scope_query(query, RaceResult)
     return query.order_by(RaceResult.created_at.desc(), RaceResult.id.desc()).limit(limit).all()
+
+
+def _saved_videos(limit=SAVED_VIDEOS_LIMIT):
+    """
+    Videá z analýz (šprint aj prekážky), ktoré smie prihlásený vidieť – ponuka
+    pre fotobunku zo záznamu. Podáva ich chránená routa /media/<súbor>.
+    """
+    if g.user is None:
+        return []
+    items = []
+    for model, kind in ((VideoAnalysis, 'šprint'), (HurdleAnalysis, 'prekážky')):
+        rows = scope_query(model.query.filter(model.stored_name.isnot(None)), model) \
+            .order_by(model.created_at.desc()).limit(limit).all()
+        for r in rows:
+            items.append({
+                'url': f'/media/{r.stored_name}',
+                'label': r.label or r.original_name or r.stored_name,
+                'kind': kind,
+                'created_at': r.created_at,
+            })
+    items.sort(key=lambda x: x['created_at'], reverse=True)
+    return items[:limit]
 
 
 def _selectable_athletes():
@@ -98,6 +128,7 @@ def page():
                            eyebrow='Časomiera', title='Stopky s fotobunkou',
                            disciplines=DISCIPLINES, other_discipline=OTHER_DISCIPLINE,
                            athletes=_selectable_athletes(),
+                           saved_videos=_saved_videos(),
                            recent=_recent_results())
 
 

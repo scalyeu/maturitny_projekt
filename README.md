@@ -4,7 +4,13 @@ Webová aplikácia pre trénera a jeho bežcov: analyzuje bežeckú techniku z v
 prekážkové medzičasy, meria časy kamerou s virtuálnou fotobunkou a drží na jednom mieste
 zverencov, ich výsledky, osobné rekordy, plán tréningov a grafy výkonnosti.
 
-**Autor:** Tomáš Žigo · **Trieda:** III.C · **SPŠE Bratislava** · maturitný projekt 2025/2026
+**Autor:** Tomáš Žigo · **Trieda:** IV.C · **SPŠE Bratislava, Zochova 9** · maturitný projekt 2026/2027
+
+**Technológie:** Python 3 · Flask · Flask-SQLAlchemy + SQLite · MediaPipe Pose + OpenCV + NumPy (kostra bežca
+z videa) · HTML, Tailwind CSS, JavaScript bez frameworku (fotobunka beží v prehliadači cez `getUserMedia`
+a `<canvas>`) · Chart.js · World Athletics (import výsledkov) · Groq API (AI tréner, voliteľné) ·
+pytest a skriptové testy na syntetických dátach · headless Chrome test cez DevTools protokol.
+Podrobnejšie v [7. Technické parametre](#7-technické-parametre).
 
 ## Zadanie
 
